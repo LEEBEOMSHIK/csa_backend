@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: csa_backend
+  profiles:
+    active: local
