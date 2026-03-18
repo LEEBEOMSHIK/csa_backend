@@ -14,6 +14,7 @@
 | [code-guidelines.md](claude-config/code-guidelines.md) | 코드 기본 룰 |
 | [style-guidelines.md](claude-config/style-guidelines.md) | 스타일 기본 룰 |
 | [project-overview.md](claude-config/project-overview.md) | 프로젝트 현황 및 설명 |
+| [oauth-guidelines.md](claude-config/oauth-guidelines.md) | OAuth 제공자별 설계 및 구현 기준 |
 
 ## 핵심 원칙
 1. 요청된 것만 변경한다 — 과도한 리팩터링 금지
