@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://prod-db-host:5432/mydatabase
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://prod-db-host:5432/csa
+    username: myuser
+    password: secret
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -11,9 +11,12 @@ spring:
     hibernate:
       ddl-auto: none
     show-sql: false
+    properties:
+      hibernate:
+        default_schema: front
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: dGVzdC1zZWNyZXQta2V5LWZvci1sb2NhbC1kZXYtb25seS0yNTZiaXQhIQ==
   access-expiration: 86400000
   refresh-expiration: 604800000
 

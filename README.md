@@ -24,48 +24,51 @@
 ### 사전 요구사항
 
 - Java 17
-- Docker Desktop (로컬 PostgreSQL 실행용)
+- Docker Desktop
 
-### 로컬 실행
+---
+
+## 실행 방법
+
+### local — Gradle 직접 실행
+
+PostgreSQL은 `spring-boot-docker-compose`가 `compose.yaml`의 컨테이너를 자동 기동합니다.
 
 ```bash
 ./gradlew bootRun
 ```
 
-> `spring-boot-docker-compose` 의존성에 의해 `compose.yaml`의 PostgreSQL 컨테이너가 자동으로 함께 기동됩니다.
+### local — Docker Compose 전체 실행
+
+백엔드 앱과 PostgreSQL을 모두 컨테이너로 기동합니다.
+
+```bash
+docker compose up --build
+```
+
+### dev — Docker Compose 실행
+
+```bash
+docker compose -f compose.dev.yaml up --build
+```
+
+### prod — Docker Compose 실행
+
+```bash
+docker compose -f compose.prod.yaml up --build
+```
 
 ---
 
 ## 프로파일 구조
 
-| 프로파일 | 파일 | 용도 |
-|----------|------|------|
-| `local` | `application-local.yaml` | 로컬 개발 — Docker Compose DB 사용 (기본값) |
-| `dev` | `application-dev.yaml` | 개발 서버 배포 |
-| `prod` | `application-prod.yaml` | 운영 서버 배포 |
+| 프로파일 | 설정 파일 | compose 파일 | 용도 |
+|----------|-----------|--------------|------|
+| `local` | `application-local.yaml` | `compose.yaml` | 로컬 개발 (기본값) |
+| `dev` | `application-dev.yaml` | `compose.dev.yaml` | 개발 서버 배포 |
+| `prod` | `application-prod.yaml` | `compose.prod.yaml` | 운영 서버 배포 |
 
-프로파일 변경:
-
-```bash
-# 실행 시 직접 지정
-./gradlew bootRun --args='--spring.profiles.active=dev'
-
-# 환경변수로 지정
-SPRING_PROFILES_ACTIVE=prod ./gradlew bootRun
-```
-
----
-
-## 환경변수
-
-운영(`prod`) 환경에서는 아래 환경변수를 반드시 설정해야 합니다.
-
-| 변수명 | 설명 |
-|--------|------|
-| `DB_USERNAME` | PostgreSQL 사용자명 |
-| `DB_PASSWORD` | PostgreSQL 비밀번호 |
-
-> API Key, JWT Secret 등 민감 정보는 절대 소스코드에 하드코딩하지 않습니다.
+각 환경의 DB 접속 정보·JWT Secret은 해당 `application-{profile}.yaml` 파일에서 관리합니다.
 
 ---
 
@@ -146,6 +149,9 @@ src/
 
 # 테스트
 ./gradlew test
+
+# Docker 이미지 빌드
+docker build -t csa_backend .
 ```
 
 ---

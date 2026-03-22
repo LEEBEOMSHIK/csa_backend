@@ -15,12 +15,60 @@
 | [style-guidelines.md](claude-config/style-guidelines.md) | 스타일 기본 룰 |
 | [project-overview.md](claude-config/project-overview.md) | 프로젝트 현황 및 설명 |
 | [oauth-guidelines.md](claude-config/oauth-guidelines.md) | OAuth 제공자별 설계 및 구현 기준 |
+| [db-guidelines.md](claude-config/db-guidelines.md) | DB 및 테이블 생성·수정·삭제 규칙, 계정 권한 |
 
 ## 핵심 원칙
 1. 요청된 것만 변경한다 — 과도한 리팩터링 금지
 2. 불필요한 주석·Javadoc 추가 금지
 3. 보안 취약점(XSS, SQL Injection, OWASP Top 10 등) 코드 작성 금지
 4. 커밋은 명시적으로 요청받을 때만 생성한다
+
+---
+
+## 트러블슈팅
+
+### [Docker] `database "xxx" does not exist` 오류
+
+**증상**
+```
+FATAL: database "xxx" does not exist
+```
+백엔드 컨테이너가 기동 직후 종료되고 위 에러가 로그에 출력된다.
+
+**원인**
+`application-*.yaml` 또는 `compose.yaml`의 DB명을 변경했을 때, 기존 postgres 볼륨(`postgres_data`)이 이전 DB명으로 이미 초기화되어 있으면 `POSTGRES_DB` 환경변수가 재적용되지 않는다.
+postgres는 볼륨 데이터가 존재하면 초기화 스크립트를 다시 실행하지 않는다.
+
+**즉시 해결**
+```bash
+docker compose down -v   # 볼륨까지 삭제
+docker compose up -d --build
+```
+
+**주의**: `-v` 옵션은 볼륨의 모든 데이터를 삭제한다. 보존이 필요한 데이터가 있으면 먼저 백업한다.
+
+**예방**
+`compose.yaml`의 `POSTGRES_DB` 값과 `application-local.yaml`의 datasource URL DB명을 항상 동일하게 유지한다.
+
+---
+
+### [Docker] `down -v` 후 Entity 컬럼 누락
+
+**증상**
+`docker compose down -v` 후 재기동 시 Entity에 추가한 컬럼이 테이블에 생성되지 않는다.
+
+**원인**
+`docker compose up -d`에서 `--build`를 생략하면 **캐시된 구 이미지**로 기동된다.
+Hibernate `ddl-auto: update`는 이미지 안의 Entity 기준으로 테이블을 생성하기 때문에,
+코드 변경 전 이미지에는 새 컬럼 정보가 없어 생성되지 않는다.
+
+**즉시 해결**
+```bash
+docker compose down -v
+docker compose up -d --build   # --build 필수
+```
+
+**규칙**: `docker compose down -v` 이후 재기동은 **반드시 `--build`를 붙인다**.
 
 ---
 
