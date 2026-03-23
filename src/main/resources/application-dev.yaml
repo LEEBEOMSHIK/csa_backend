@@ -24,3 +24,7 @@ logging:
   level:
     root: INFO
     org.example.csa_backend: INFO
+
+google:
+  oauth:
+    client-id: ""
