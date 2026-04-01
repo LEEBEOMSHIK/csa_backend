@@ -3,7 +3,10 @@ package org.example.csa_backend.fairytale;
 import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.fairytale.dto.CategoryDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
+import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
+import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.HomePageDto;
+import org.example.csa_backend.fairytale.service.AiFairytaleService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +18,7 @@ import java.util.List;
 public class FairytaleController {
 
     private final FairytaleService fairytaleService;
+    private final AiFairytaleService aiFairytaleService;
 
     @GetMapping("/categories")
     public ResponseEntity<List<CategoryDto>> getCategories() {
@@ -30,5 +34,11 @@ public class FairytaleController {
     @GetMapping("/{id}/detail")
     public ResponseEntity<FairytaleDetailDto> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(fairytaleService.getFairytaleDetail(id));
+    }
+
+    @PostMapping("/generate")
+    public ResponseEntity<FairytaleGenerateResponse> generate(
+            @RequestBody FairytaleGenerateRequest request) {
+        return ResponseEntity.ok(aiFairytaleService.generate(request));
     }
 }

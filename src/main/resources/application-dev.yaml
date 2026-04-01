@@ -28,3 +28,25 @@ logging:
 google:
   oauth:
     client-id: ""
+
+ai:
+  claude:
+    api-key: ${CLAUDE_API_KEY:}
+    model: claude-sonnet-4-6
+    base-url: https://api.anthropic.com
+  dalle:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: https://api.openai.com
+  elevenlabs:
+    api-key: ${ELEVENLABS_API_KEY:}
+    base-url: https://api.elevenlabs.io
+    voice-ids:
+      dad: ${ELEVENLABS_VOICE_DAD:}
+      mom: ${ELEVENLABS_VOICE_MOM:}
+      grandma: ${ELEVENLABS_VOICE_GRANDMA:}
+      grandpa: ${ELEVENLABS_VOICE_GRANDPA:}
+
+storage:
+  mode: local
+  local-base-path: C:/project/csa/generated-fairytales
+  server-base-url: ${DEV_SERVER_BASE_URL:http://localhost:8080}
