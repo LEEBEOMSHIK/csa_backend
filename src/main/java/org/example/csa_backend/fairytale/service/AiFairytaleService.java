@@ -2,12 +2,16 @@ package org.example.csa_backend.fairytale.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.csa_backend.common.exception.BusinessException;
+import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.fairytale.AiFairytale;
 import org.example.csa_backend.fairytale.AiFairytalePage;
 import org.example.csa_backend.fairytale.AiFairytalePageRepository;
 import org.example.csa_backend.fairytale.AiFairytaleRepository;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
+import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
+import org.example.csa_backend.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,9 +29,10 @@ public class AiFairytaleService {
     private final AiImageService aiImageService;
     private final AiTtsService aiTtsService;
     private final FileStorageService fileStorageService;
+    private final UserRepository userRepository;
 
     @Transactional
-    public FairytaleGenerateResponse generate(FairytaleGenerateRequest request) {
+    public FairytaleGenerateResponse generate(FairytaleGenerateRequest request, Long userId) {
         String settingsStr = String.join(",", request.settings());
 
         AiFairytale fairytale = new AiFairytale(
@@ -41,6 +46,9 @@ public class AiFairytaleService {
                 request.format() != null ? request.format() : "slide",
                 "GENERATING"
         );
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(fairytale::assignOwner);
+        }
         aiFairytaleRepository.save(fairytale);
 
         try {
@@ -86,5 +94,42 @@ public class AiFairytaleService {
             log.error("AI 동화 생성 실패: id={}", fairytale.getId(), e);
             throw e;
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyFairytaleDto> getMyFairytales(Long userId) {
+        return aiFairytaleRepository.findByOwnerIdOrderByIdDesc(userId).stream()
+                .map(MyFairytaleDto::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyFairytaleDto> getSharedFairytales() {
+        return aiFairytaleRepository.findBySharedAndStatusOrderByIdDesc("Y", "COMPLETED").stream()
+                .map(MyFairytaleDto::from)
+                .toList();
+    }
+
+    @Transactional
+    public boolean toggleShare(Long userId, Long fairytaleId) {
+        AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
+        fairytale.updateShared(!fairytale.isShared());
+        return fairytale.isShared();
+    }
+
+    @Transactional
+    public void deleteMyFairytale(Long userId, Long fairytaleId) {
+        AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
+        aiFairytaleRepository.delete(fairytale);
+        fileStorageService.deleteFiles(fairytaleId);
+    }
+
+    private AiFairytale getOwnedFairytale(Long userId, Long fairytaleId) {
+        AiFairytale fairytale = aiFairytaleRepository.findById(fairytaleId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        if (!fairytale.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        return fairytale;
     }
 }

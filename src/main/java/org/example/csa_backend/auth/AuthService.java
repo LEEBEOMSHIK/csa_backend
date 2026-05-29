@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.auth.dto.LoginRequest;
 import org.example.csa_backend.auth.dto.SignupRequest;
 import org.example.csa_backend.auth.dto.TokenResponse;
+import org.example.csa_backend.common.exception.BusinessException;
+import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.jwt.JwtProvider;
 import org.example.csa_backend.user.RefreshToken;
 import org.example.csa_backend.user.RefreshTokenRepository;
@@ -31,7 +33,7 @@ public class AuthService {
     @Transactional
     public void signup(SignupRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("Email already in use");
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
         }
         userRepository.save(new User(request.email(), passwordEncoder.encode(request.password())));
     }
@@ -39,10 +41,10 @@ public class AuthService {
     @Transactional
     public TokenResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
-            throw new IllegalArgumentException("Invalid email or password");
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
         String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getEmail());
@@ -56,20 +58,20 @@ public class AuthService {
     @Transactional
     public TokenResponse refresh(String rawRefreshToken) {
         if (!jwtProvider.validateToken(rawRefreshToken)) {
-            throw new IllegalArgumentException("Invalid refresh token");
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
 
         Long userId = Long.parseLong(jwtProvider.extractClaims(rawRefreshToken).getSubject());
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
         RefreshToken stored = refreshTokenRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalArgumentException("Refresh token not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
         if (stored.getExpiresAt().isBefore(LocalDateTime.now())
                 || !hashToken(rawRefreshToken).equals(stored.getTokenHash())) {
             refreshTokenRepository.delete(stored);
-            throw new IllegalArgumentException("Refresh token expired or invalid");
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "리프레시 토큰이 만료되었거나 유효하지 않습니다.");
         }
 
         String newAccessToken = jwtProvider.generateAccessToken(user.getId(), user.getEmail());

@@ -1,7 +1,7 @@
 package org.example.csa_backend.fairytale.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.csa_backend.config.AiProperties;
@@ -48,7 +48,7 @@ public class AiImageService {
                     .body(String.class);
 
             JsonNode root = objectMapper.readTree(responseBody);
-            String imageUrl = root.path("data").get(0).path("url").asText();
+            String imageUrl = root.path("data").get(0).path("url").asString();
 
             return downloadBytes(imageUrl);
         } catch (Exception e) {

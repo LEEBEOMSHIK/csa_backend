@@ -1,7 +1,7 @@
 package org.example.csa_backend.fairytale.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.csa_backend.config.AiProperties;
@@ -102,7 +102,7 @@ public class AiTextService {
 
     private GeneratedFairytale parseClaudeResponse(String responseBody) throws Exception {
         JsonNode root = objectMapper.readTree(responseBody);
-        String text = root.path("content").get(0).path("text").asText();
+        String text = root.path("content").get(0).path("text").asString();
 
         text = text.strip();
         if (text.startsWith("```")) {
@@ -114,13 +114,13 @@ public class AiTextService {
         }
 
         JsonNode json = objectMapper.readTree(text);
-        String title = json.path("title").asText("동화");
+        String title = json.path("title").asString("동화");
 
         List<GeneratedPage> pages = new ArrayList<>();
         for (JsonNode page : json.path("pages")) {
             pages.add(new GeneratedPage(
                     page.path("pageIndex").asInt(),
-                    page.path("text").asText()
+                    page.path("text").asString()
             ));
         }
 

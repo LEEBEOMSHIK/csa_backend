@@ -1,5 +1,7 @@
 package org.example.csa_backend.auth.oauth;
 
+import org.example.csa_backend.common.exception.BusinessException;
+import org.example.csa_backend.common.exception.ErrorCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -20,7 +22,7 @@ public class GoogleOAuthClient {
                 .body(Map.class);
 
         if (response == null || response.get("sub") == null) {
-            throw new IllegalArgumentException("Invalid Google access token");
+            throw new BusinessException(ErrorCode.INVALID_TOKEN, "유효하지 않은 Google 액세스 토큰입니다.");
         }
 
         return new GoogleUserInfo(

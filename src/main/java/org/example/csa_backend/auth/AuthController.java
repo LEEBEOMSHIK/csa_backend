@@ -9,8 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -32,10 +30,5 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<TokenResponse> refresh(@RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request.refreshToken()));
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
     }
 }

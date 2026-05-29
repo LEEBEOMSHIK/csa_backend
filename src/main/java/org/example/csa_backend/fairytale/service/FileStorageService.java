@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
@@ -37,6 +39,30 @@ public class FileStorageService {
             return uploadToCdn("audio", fairytaleId, pageIndex, voiceType, language, data, ".mp3");
         }
         return saveLocally(fairytaleId, filename, data, "generated-fairytales");
+    }
+
+    public void deleteFiles(Long fairytaleId) {
+        if ("cdn".equalsIgnoreCase(storageProperties.getMode())) {
+            // TODO: CDN(S3/GCS) 객체 삭제 연동
+            log.info("CDN 파일 삭제 준비: fairytaleId={} (추후 구현)", fairytaleId);
+            return;
+        }
+
+        Path dir = Paths.get(storageProperties.getLocalBasePath(), fairytaleId.toString());
+        if (!Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(dir)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.delete(path);
+                } catch (IOException e) {
+                    log.warn("파일 삭제 실패: {}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            log.error("동화 파일 삭제 실패: fairytaleId={}", fairytaleId, e);
+        }
     }
 
     private String saveLocally(Long fairytaleId, String filename, byte[] data,

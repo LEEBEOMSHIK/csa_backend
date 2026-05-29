@@ -2,6 +2,8 @@ package org.example.csa_backend.auth.oauth;
 
 import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.auth.dto.TokenResponse;
+import org.example.csa_backend.common.exception.BusinessException;
+import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.jwt.JwtProvider;
 import org.example.csa_backend.user.RefreshToken;
 import org.example.csa_backend.user.RefreshTokenRepository;
@@ -28,7 +30,7 @@ public class OAuthService {
     @Transactional
     public TokenResponse processOAuth(String provider, OAuthRequest request) {
         if (!"google".equals(provider)) {
-            throw new IllegalArgumentException("Unsupported provider: " + provider);
+            throw new BusinessException(ErrorCode.UNSUPPORTED_PROVIDER, "지원하지 않는 소셜 로그인 제공자입니다: " + provider);
         }
 
         GoogleUserInfo userInfo = googleOAuthClient.getUserInfo(request.accessToken());

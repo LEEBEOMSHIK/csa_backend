@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.example.csa_backend.common.BaseEntity;
+import org.example.csa_backend.user.User;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,13 @@ public class AiFairytale extends BaseEntity {
     @Column(name = "STATUS", length = 20, nullable = false)
     private String status;
 
+    @Column(name = "SHARED", length = 1, nullable = false)
+    private String shared = "N";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "USER_ID")
+    private User owner;
+
     @OneToMany(mappedBy = "aiFairytale", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("pageIndex ASC")
     private List<AiFairytalePage> pages = new ArrayList<>();
@@ -70,5 +78,21 @@ public class AiFairytale extends BaseEntity {
 
     public void updateTitle(String title) {
         this.title = title;
+    }
+
+    public void assignOwner(User owner) {
+        this.owner = owner;
+    }
+
+    public void updateShared(boolean shared) {
+        this.shared = shared ? "Y" : "N";
+    }
+
+    public boolean isShared() {
+        return "Y".equals(this.shared);
+    }
+
+    public boolean isOwnedBy(Long userId) {
+        return owner != null && owner.getId().equals(userId);
     }
 }
