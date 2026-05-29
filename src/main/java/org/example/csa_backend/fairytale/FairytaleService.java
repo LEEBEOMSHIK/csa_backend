@@ -5,6 +5,7 @@ import org.example.csa_backend.fairytale.dto.CategoryDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDto;
 import org.example.csa_backend.fairytale.dto.HomePageDto;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,5 +50,20 @@ public class FairytaleService {
         FairytaleDetail detail = fairytaleDetailRepository.findByFairytaleId(fairytaleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detail not found"));
         return FairytaleDetailDto.from(detail);
+    }
+
+    public List<FairytaleDto> getFairytales(String categoryKey, String sort) {
+        String key = (categoryKey != null && !categoryKey.isBlank()) ? categoryKey : null;
+        return fairytaleRepository.findCurated(key, resolveSort(sort)).stream()
+                .map(FairytaleDto::from)
+                .toList();
+    }
+
+    private Sort resolveSort(String sort) {
+        return switch (sort != null ? sort : "latest") {
+            case "rating" -> Sort.by(Sort.Direction.DESC, "rating");
+            case "title" -> Sort.by(Sort.Direction.ASC, "title");
+            default -> Sort.by(Sort.Direction.DESC, "id");
+        };
     }
 }

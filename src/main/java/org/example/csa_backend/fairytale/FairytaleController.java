@@ -5,6 +5,7 @@ import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.fairytale.dto.CategoryDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
+import org.example.csa_backend.fairytale.dto.FairytaleDto;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.HomePageDto;
@@ -34,6 +35,13 @@ public class FairytaleController {
     public ResponseEntity<HomePageDto> getHomePage(
             @RequestParam(required = false) String category) {
         return ResponseEntity.ok(fairytaleService.getHomePage(category));
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<List<FairytaleDto>> getFairytales(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String sort) {
+        return ResponseEntity.ok(fairytaleService.getFairytales(category, sort));
     }
 
     @GetMapping("/{id}/detail")

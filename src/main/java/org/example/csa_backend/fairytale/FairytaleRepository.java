@@ -1,5 +1,6 @@
 package org.example.csa_backend.fairytale;
 
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -7,6 +8,15 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface FairytaleRepository extends JpaRepository<Fairytale, Long> {
+
+    @Query("""
+        SELECT f FROM Fairytale f
+        WHERE f.delYn = 'N'
+          AND (:categoryKey IS NULL OR EXISTS (
+              SELECT 1 FROM f.categories c WHERE c.categoryKey = :categoryKey
+          ))
+        """)
+    List<Fairytale> findCurated(@Param("categoryKey") String categoryKey, Sort sort);
 
     @Query("""
         SELECT f FROM Fairytale f
