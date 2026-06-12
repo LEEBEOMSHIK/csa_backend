@@ -8,6 +8,8 @@ import java.util.List;
 public record FairytaleGenerateResponse(
         Long id,
         String title,
+        String language,
+        String voiceType,
         List<PageDto> pages
 ) {
     public record PageDto(int pageIndex, String text, String imageUrl, String audioUrl) {}
@@ -16,6 +18,12 @@ public record FairytaleGenerateResponse(
         List<PageDto> pageDtos = fairytale.getPages().stream()
                 .map(p -> new PageDto(p.getPageIndex(), p.getText(), p.getImageUrl(), p.getAudioUrl()))
                 .toList();
-        return new FairytaleGenerateResponse(fairytale.getId(), fairytale.getTitle(), pageDtos);
+        return new FairytaleGenerateResponse(
+                fairytale.getId(),
+                fairytale.getTitle(),
+                fairytale.getLanguage(),
+                fairytale.getVoiceType(),
+                pageDtos
+        );
     }
 }

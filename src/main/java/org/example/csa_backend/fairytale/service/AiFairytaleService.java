@@ -110,6 +110,15 @@ public class AiFairytaleService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public FairytaleGenerateResponse getMyFairytaleSlides(Long userId, Long fairytaleId) {
+        AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
+        if (!"COMPLETED".equals(fairytale.getStatus())) {
+            throw new BusinessException(ErrorCode.INVALID_STATE);
+        }
+        return FairytaleGenerateResponse.from(fairytale);
+    }
+
     @Transactional
     public boolean toggleShare(Long userId, Long fairytaleId) {
         AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);

@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: csa_backend
+  docker:
+    compose:
+      enabled: false
+  datasource:
+    url: jdbc:h2:mem:csa;MODE=PostgreSQL;DATABASE_TO_UPPER=false
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+jwt:
+  secret: dGVzdC1zZWNyZXQta2V5LWZvci1sb2NhbC1kZXYtb25seS0yNTZiaXQhIQ==
+  access-expiration: 86400000
+  refresh-expiration: 604800000
+
+storage:
+  mode: local
+  local-base-path: C:/tmp/csa-test-generated-fairytales
+  server-base-url: http://localhost:8080
