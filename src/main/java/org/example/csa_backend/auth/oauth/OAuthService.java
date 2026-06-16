@@ -5,6 +5,7 @@ import org.example.csa_backend.auth.dto.TokenResponse;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.jwt.JwtProvider;
+import org.example.csa_backend.setting.UserSettingsService;
 import org.example.csa_backend.user.RefreshToken;
 import org.example.csa_backend.user.RefreshTokenRepository;
 import org.example.csa_backend.user.User;
@@ -26,6 +27,7 @@ public class OAuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProvider jwtProvider;
     private final GoogleOAuthClient googleOAuthClient;
+    private final UserSettingsService userSettingsService;
 
     @Transactional
     public TokenResponse processOAuth(String provider, OAuthRequest request) {
@@ -36,9 +38,13 @@ public class OAuthService {
         GoogleUserInfo userInfo = googleOAuthClient.getUserInfo(request.accessToken());
 
         User user = userRepository.findByProviderAndProviderId("google", userInfo.sub())
-                .orElseGet(() -> userRepository.save(
-                        new User(userInfo.email(), "google", userInfo.sub(), userInfo.name(), request.locale())
-                ));
+                .orElseGet(() -> {
+                    User newUser = userRepository.save(
+                            new User(userInfo.email(), "google", userInfo.sub(), userInfo.name(), request.locale())
+                    );
+                    userSettingsService.createDefaultSettings(newUser);
+                    return newUser;
+                });
 
         String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getEmail());
         String rawRefreshToken = jwtProvider.generateRefreshToken(user.getId());
