@@ -113,6 +113,55 @@ class UserSettingsServiceTest {
     }
 
     @Test
+    void getSettingsDefaultsSubscriptionTierToFree() {
+        User user = user(5L);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.empty());
+        when(userSettingsRepository.save(any(UserSettings.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserSettingsDto dto = service.getSettings(5L);
+
+        assertThat(dto.subscriptionTier()).isEqualTo("FREE");
+    }
+
+    @Test
+    void updateSettingsDoesNotChangeSubscriptionTier() {
+        User user = user(5L);
+        UserSettings settings = new UserSettings(user);
+        settings.updateSubscriptionTier("PREMIUM");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.of(settings));
+
+        UserSettingsDto dto = service.updateSettings(5L,
+                new UpdateSettingsRequest("ja", false, true));
+
+        assertThat(dto.subscriptionTier()).isEqualTo("PREMIUM");
+        assertThat(settings.getSubscriptionTier()).isEqualTo("PREMIUM");
+    }
+
+    @Test
+    void updateSubscriptionTierPromotesToPremium() {
+        User user = user(5L);
+        UserSettings settings = new UserSettings(user);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.of(settings));
+
+        UserSettingsDto dto = service.updateSubscriptionTier(5L, "PREMIUM");
+
+        assertThat(dto.subscriptionTier()).isEqualTo("PREMIUM");
+        assertThat(settings.isPremium()).isTrue();
+    }
+
+    @Test
+    void updateSubscriptionTierRejectsInvalidTier() {
+        assertThatThrownBy(() -> service.updateSubscriptionTier(5L, "GOLD"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_INPUT);
+        verify(userRepository, never()).findById(any());
+    }
+
+    @Test
     void getSettingsRejectsUnknownUser() {
         when(userRepository.findById(404L)).thenReturn(Optional.empty());
 

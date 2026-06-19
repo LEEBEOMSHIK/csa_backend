@@ -31,6 +31,9 @@ public class UserSettings {
     @Column(name = "push_noti_yn", nullable = false, length = 1)
     private String pushNotiYn = "Y";
 
+    @Column(name = "subscription_tier", nullable = false, length = 10)
+    private String subscriptionTier = "FREE";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -46,6 +49,15 @@ public class UserSettings {
         this.textNotiYn = textNotiEnabled ? "Y" : "N";
         this.pushNotiYn = pushNotiEnabled ? "Y" : "N";
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateSubscriptionTier(String tier) {
+        this.subscriptionTier = tier;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isPremium() {
+        return "PREMIUM".equals(subscriptionTier);
     }
 
     public boolean isTextNotiEnabled() {

@@ -30,6 +30,16 @@ public class UserSettingsService {
         return UserSettingsDto.from(settings);
     }
 
+    @Transactional
+    public UserSettingsDto updateSubscriptionTier(Long userId, String tier) {
+        if (!("FREE".equals(tier) || "PREMIUM".equals(tier))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 구독 등급입니다.");
+        }
+        UserSettings settings = getOrCreateSettings(userId);
+        settings.updateSubscriptionTier(tier);
+        return UserSettingsDto.from(settings);
+    }
+
     private void validate(UpdateSettingsRequest request) {
         if (request.locale() == null || !("ko".equals(request.locale()) || "ja".equals(request.locale()))) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "지원하지 않는 언어입니다.");
