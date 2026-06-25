@@ -33,6 +33,7 @@
 ### local — Gradle 직접 실행
 
 PostgreSQL은 `spring-boot-docker-compose`가 `compose.yaml`의 컨테이너를 자동 기동합니다.
+로컬 포트는 다른 프로젝트와 충돌하지 않도록 백엔드 `18080`, PostgreSQL `15432`를 사용합니다.
 
 ```bash
 ./gradlew bootRun
@@ -45,6 +46,8 @@ PostgreSQL은 `spring-boot-docker-compose`가 `compose.yaml`의 컨테이너를 
 ```bash
 docker compose up --build
 ```
+
+컨테이너 실행 후 백엔드는 `http://localhost:18080`에서 접근합니다.
 
 ### dev — Docker Compose 실행
 
