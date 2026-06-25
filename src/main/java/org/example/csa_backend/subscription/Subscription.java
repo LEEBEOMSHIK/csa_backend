@@ -81,7 +81,12 @@ public class Subscription {
     }
 
     public boolean isActive() {
-        return status == SubscriptionStatus.ACTIVE || status == SubscriptionStatus.GRACE;
+        if (status == SubscriptionStatus.ACTIVE || status == SubscriptionStatus.GRACE) {
+            return true;
+        }
+        return status == SubscriptionStatus.CANCELED
+                && currentPeriodEnd != null
+                && currentPeriodEnd.isAfter(LocalDateTime.now());
     }
 
     public boolean isAutoRenewEnabled() {

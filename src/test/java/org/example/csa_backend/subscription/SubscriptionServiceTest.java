@@ -108,6 +108,37 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    void verifyAndApplyKeepsCanceledSubscriptionPremiumUntilPeriodEnd() {
+        User user = user(1L);
+        UserSettings settings = new UserSettings(user);
+        stubVerifierAvailable();
+        when(verifier.verify(Platform.GOOGLE, "token-1", "premium_monthly"))
+                .thenReturn(new VerificationResult(
+                        "token-1",
+                        SubscriptionStatus.CANCELED,
+                        LocalDateTime.now().plusDays(7),
+                        false,
+                        StoreEnvironment.PRODUCTION
+                ));
+        when(subscriptionRepository.findByOriginalTransactionId("token-1")).thenReturn(Optional.empty());
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.of(settings));
+
+        Subscription[] saved = new Subscription[1];
+        when(subscriptionRepository.findByUser(user))
+                .thenAnswer(inv -> saved[0] == null ? List.of() : List.of(saved[0]));
+        when(subscriptionRepository.save(any(Subscription.class))).thenAnswer(inv -> {
+            Subscription s = withId(inv.getArgument(0), 100L);
+            saved[0] = s;
+            return s;
+        });
+
+        SubscriptionDto dto = service.verifyAndApply(user, Platform.GOOGLE, "token-1", "premium_monthly");
+
+        assertThat(dto.status()).isEqualTo(SubscriptionStatus.CANCELED);
+        assertThat(settings.getSubscriptionTier()).isEqualTo("PREMIUM");
+    }
+
+    @Test
     void verifyAndApplyRejectsWhenVerifierAbsent() {
         User user = user(1L);
         when(receiptVerifierProvider.getIfAvailable()).thenReturn(null);

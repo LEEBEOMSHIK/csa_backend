@@ -75,6 +75,20 @@ docker compose -f compose.prod.yaml up --build
 
 ---
 
+## 결제 검증 설정
+
+`prod` 프로파일에서는 Google Play 영수증을 Android Publisher API로 검증합니다. 로컬·dev에서는 stub 검증기가 활성화되어 실제 스토어 없이 `/subscriptions/verify` 흐름을 테스트할 수 있습니다.
+
+| 환경변수 | 설명 |
+|----------|------|
+| `STORE_GOOGLE_PACKAGE_NAME` | Play Console에 등록된 Android applicationId |
+| `STORE_GOOGLE_SERVICE_ACCOUNT_EMAIL` | Android Publisher API 권한이 있는 서비스 계정 이메일 |
+| `STORE_GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | 서비스 계정 private key. 줄바꿈은 `\n` 문자열로 주입 가능 |
+
+프론트엔드 상품 ID는 `premium_monthly`입니다. Play Console의 구독 product ID도 동일해야 합니다.
+
+---
+
 ## API 구조
 
 ### 인증 (Auth)
