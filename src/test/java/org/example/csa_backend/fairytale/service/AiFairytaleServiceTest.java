@@ -78,6 +78,51 @@ class AiFairytaleServiceTest {
                 .isEqualTo(ErrorCode.INVALID_STATE);
     }
 
+    @Test
+    void getSharedFairytaleSlidesReturnsSharedCompletedPages() {
+        AiFairytale fairytale = completedFairytale(7L, 11L);
+        fairytale.updateShared(true);
+        fairytale.getPages().add(new AiFairytalePage(
+                fairytale,
+                1,
+                "공유 페이지",
+                "https://cdn.example.com/shared.png",
+                "https://cdn.example.com/shared.mp3"
+        ));
+        when(aiFairytaleRepository.findById(7L)).thenReturn(Optional.of(fairytale));
+
+        FairytaleGenerateResponse response = service.getSharedFairytaleSlides(7L);
+
+        assertThat(response.id()).isEqualTo(7L);
+        assertThat(response.title()).isEqualTo("별빛 모험");
+        assertThat(response.pages()).hasSize(1);
+        assertThat(response.pages().get(0).text()).isEqualTo("공유 페이지");
+    }
+
+    @Test
+    void getSharedFairytaleSlidesHidesPrivateFairytale() {
+        AiFairytale fairytale = completedFairytale(7L, 11L);
+        when(aiFairytaleRepository.findById(7L)).thenReturn(Optional.of(fairytale));
+
+        assertThatThrownBy(() -> service.getSharedFairytaleSlides(7L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void getSharedFairytaleSlidesRejectsIncompleteFairytale() {
+        AiFairytale fairytale = completedFairytale(7L, 11L);
+        fairytale.updateShared(true);
+        fairytale.updateStatus("GENERATING");
+        when(aiFairytaleRepository.findById(7L)).thenReturn(Optional.of(fairytale));
+
+        assertThatThrownBy(() -> service.getSharedFairytaleSlides(7L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STATE);
+    }
+
     private AiFairytale completedFairytale(Long fairytaleId, Long ownerId) {
         AiFairytale fairytale = new AiFairytale(
                 "별빛 모험",

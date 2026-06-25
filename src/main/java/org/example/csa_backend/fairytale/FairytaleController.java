@@ -65,6 +65,11 @@ public class FairytaleController {
         return ResponseEntity.ok(aiFairytaleService.getSharedFairytales());
     }
 
+    @GetMapping("/shared/{id}/slides")
+    public ResponseEntity<FairytaleGenerateResponse> getSharedFairytaleSlides(@PathVariable Long id) {
+        return ResponseEntity.ok(aiFairytaleService.getSharedFairytaleSlides(id));
+    }
+
     @GetMapping("/{id}/slides")
     public ResponseEntity<FairytaleGenerateResponse> getMyFairytaleSlides(
             @PathVariable Long id, Authentication authentication) {

@@ -119,6 +119,19 @@ public class AiFairytaleService {
         return FairytaleGenerateResponse.from(fairytale);
     }
 
+    @Transactional(readOnly = true)
+    public FairytaleGenerateResponse getSharedFairytaleSlides(Long fairytaleId) {
+        AiFairytale fairytale = aiFairytaleRepository.findById(fairytaleId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        if (!fairytale.isShared()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        if (!"COMPLETED".equals(fairytale.getStatus())) {
+            throw new BusinessException(ErrorCode.INVALID_STATE);
+        }
+        return FairytaleGenerateResponse.from(fairytale);
+    }
+
     @Transactional
     public boolean toggleShare(Long userId, Long fairytaleId) {
         AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
