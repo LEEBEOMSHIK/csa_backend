@@ -10,11 +10,15 @@ import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
+import java.util.List;
+import java.util.stream.IntStream;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 class S3MediaStorageClientTest {
@@ -71,5 +75,37 @@ class S3MediaStorageClientTest {
         client.deleteByPrefix("fairytales/99/");
 
         verify(s3Client, never()).deleteObjects(any(DeleteObjectsRequest.class));
+    }
+
+    @Test
+    void deleteByPrefixPaginatesAndDeletesInBatchesOfThousand() {
+        List<S3Object> firstPageObjects = IntStream.rangeClosed(1, 1000)
+                .mapToObj(i -> S3Object.builder().key("fairytales/7/page_" + i + ".png").build())
+                .toList();
+        ListObjectsV2Response firstPage = ListObjectsV2Response.builder()
+                .contents(firstPageObjects)
+                .isTruncated(true)
+                .nextContinuationToken("next-page")
+                .build();
+        ListObjectsV2Response secondPage = ListObjectsV2Response.builder()
+                .contents(S3Object.builder().key("fairytales/7/page_1001.png").build())
+                .isTruncated(false)
+                .build();
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenReturn(firstPage, secondPage);
+
+        client.deleteByPrefix("fairytales/7/");
+
+        ArgumentCaptor<ListObjectsV2Request> listCaptor = ArgumentCaptor.forClass(ListObjectsV2Request.class);
+        verify(s3Client, times(2)).listObjectsV2(listCaptor.capture());
+        assertThat(listCaptor.getAllValues().get(0).continuationToken()).isNull();
+        assertThat(listCaptor.getAllValues().get(1).continuationToken()).isEqualTo("next-page");
+
+        ArgumentCaptor<DeleteObjectsRequest> deleteCaptor = ArgumentCaptor.forClass(DeleteObjectsRequest.class);
+        verify(s3Client, times(2)).deleteObjects(deleteCaptor.capture());
+        assertThat(deleteCaptor.getAllValues().get(0).delete().objects()).hasSize(1000);
+        assertThat(deleteCaptor.getAllValues().get(1).delete().objects())
+                .extracting("key")
+                .containsExactly("fairytales/7/page_1001.png");
     }
 }

@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -64,23 +65,38 @@ public class S3MediaStorageClient {
     }
 
     public void deleteByPrefix(String prefix) {
-        ListObjectsV2Response listing = s3Client.listObjectsV2(ListObjectsV2Request.builder()
-                .bucket(bucket)
-                .prefix(prefix)
-                .build());
+        String continuationToken = null;
+        do {
+            ListObjectsV2Request.Builder listRequest = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix);
+            if (continuationToken != null) {
+                listRequest.continuationToken(continuationToken);
+            }
 
-        List<ObjectIdentifier> keys = listing.contents().stream()
-                .map(S3Object::key)
-                .map(k -> ObjectIdentifier.builder().key(k).build())
-                .toList();
+            ListObjectsV2Response listing = s3Client.listObjectsV2(listRequest.build());
+            List<ObjectIdentifier> keys = listing.contents().stream()
+                    .map(S3Object::key)
+                    .map(k -> ObjectIdentifier.builder().key(k).build())
+                    .toList();
 
+            deleteInBatches(keys);
+            continuationToken = listing.nextContinuationToken();
+        } while (continuationToken != null);
+    }
+
+    private void deleteInBatches(List<ObjectIdentifier> keys) {
         if (keys.isEmpty()) {
             return;
         }
 
-        s3Client.deleteObjects(DeleteObjectsRequest.builder()
-                .bucket(bucket)
-                .delete(Delete.builder().objects(keys).build())
-                .build());
+        for (int start = 0; start < keys.size(); start += 1000) {
+            int end = Math.min(start + 1000, keys.size());
+            List<ObjectIdentifier> batch = new ArrayList<>(keys.subList(start, end));
+            s3Client.deleteObjects(DeleteObjectsRequest.builder()
+                    .bucket(bucket)
+                    .delete(Delete.builder().objects(batch).build())
+                    .build());
+        }
     }
 }
