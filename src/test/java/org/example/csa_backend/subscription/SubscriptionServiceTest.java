@@ -6,7 +6,6 @@ import org.example.csa_backend.setting.UserSettings;
 import org.example.csa_backend.setting.UserSettingsRepository;
 import org.example.csa_backend.user.User;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -24,20 +23,20 @@ import static org.mockito.Mockito.when;
 
 class SubscriptionServiceTest {
 
-    @SuppressWarnings("unchecked")
-    private final ObjectProvider<ReceiptVerifier> receiptVerifierProvider = mock(ObjectProvider.class);
     private final SubscriptionRepository subscriptionRepository = mock(SubscriptionRepository.class);
     private final UserSettingsRepository userSettingsRepository = mock(UserSettingsRepository.class);
     private final ReceiptVerifier verifier = mock(ReceiptVerifier.class);
+    private final ReceiptVerifierDispatcher dispatcher =
+            new ReceiptVerifierDispatcher(List.of(verifier));
 
     private final SubscriptionService service = new SubscriptionService(
-            receiptVerifierProvider, subscriptionRepository, userSettingsRepository);
+            dispatcher, subscriptionRepository, userSettingsRepository);
 
     @Test
     void verifyAndApplyCreatesNewSubscriptionAndPromotesTier() {
         User user = user(1L);
         UserSettings settings = new UserSettings(user);
-        stubVerifierAvailable();
+        supports(Platform.APPLE);
         when(verifier.verify(Platform.APPLE, "token-1", "premium_monthly"))
                 .thenReturn(activeResult("orig-1"));
         when(subscriptionRepository.findByOriginalTransactionId("orig-1")).thenReturn(Optional.empty());
@@ -67,7 +66,7 @@ class SubscriptionServiceTest {
         UserSettings settings = new UserSettings(user);
         Subscription existing = withId(new Subscription(
                 user, Platform.GOOGLE, "premium_monthly", "orig-9", StoreEnvironment.SANDBOX), 50L);
-        stubVerifierAvailable();
+        supports(Platform.GOOGLE);
         when(verifier.verify(Platform.GOOGLE, "orig-9", "premium_monthly"))
                 .thenReturn(activeResult("orig-9"));
         when(subscriptionRepository.findByOriginalTransactionId("orig-9"))
@@ -83,6 +82,27 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    void verifyAndApplyRejectsCrossUserOriginalTransaction() {
+        User owner = user(1L);
+        User attacker = user(2L);
+        Subscription existing = withId(new Subscription(
+                owner, Platform.APPLE, "premium_monthly", "orig-7", StoreEnvironment.PRODUCTION), 70L);
+        supports(Platform.APPLE);
+        when(verifier.verify(Platform.APPLE, "token-7", "premium_monthly"))
+                .thenReturn(activeResult("orig-7"));
+        when(subscriptionRepository.findByOriginalTransactionId("orig-7"))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() ->
+                service.verifyAndApply(attacker, Platform.APPLE, "token-7", "premium_monthly"))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FORBIDDEN);
+
+        verify(subscriptionRepository, never()).save(any(Subscription.class));
+    }
+
+    @Test
     void verifyAndApplyExpiresOtherActiveSubscriptions() {
         User user = user(1L);
         UserSettings settings = new UserSettings(user);
@@ -91,7 +111,7 @@ class SubscriptionServiceTest {
         Subscription current = withId(new Subscription(
                 user, Platform.APPLE, "premium_monthly", "orig-new", StoreEnvironment.SANDBOX), 11L);
 
-        stubVerifierAvailable();
+        supports(Platform.APPLE);
         when(verifier.verify(Platform.APPLE, "orig-new", "premium_monthly"))
                 .thenReturn(activeResult("orig-new"));
         when(subscriptionRepository.findByOriginalTransactionId("orig-new"))
@@ -111,7 +131,7 @@ class SubscriptionServiceTest {
     void verifyAndApplyKeepsCanceledSubscriptionPremiumUntilPeriodEnd() {
         User user = user(1L);
         UserSettings settings = new UserSettings(user);
-        stubVerifierAvailable();
+        supports(Platform.GOOGLE);
         when(verifier.verify(Platform.GOOGLE, "token-1", "premium_monthly"))
                 .thenReturn(new VerificationResult(
                         "token-1",
@@ -141,9 +161,11 @@ class SubscriptionServiceTest {
     @Test
     void verifyAndApplyRejectsWhenVerifierAbsent() {
         User user = user(1L);
-        when(receiptVerifierProvider.getIfAvailable()).thenReturn(null);
+        SubscriptionService emptyService = new SubscriptionService(
+                new ReceiptVerifierDispatcher(List.of()), subscriptionRepository, userSettingsRepository);
 
-        assertThatThrownBy(() -> service.verifyAndApply(user, Platform.APPLE, "token-1", "premium_monthly"))
+        assertThatThrownBy(() ->
+                emptyService.verifyAndApply(user, Platform.APPLE, "token-1", "premium_monthly"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.EXTERNAL_API_ERROR);
@@ -175,8 +197,8 @@ class SubscriptionServiceTest {
         assertThat(service.getMySubscription(user)).isEmpty();
     }
 
-    private void stubVerifierAvailable() {
-        when(receiptVerifierProvider.getIfAvailable()).thenReturn(verifier);
+    private void supports(Platform platform) {
+        when(verifier.supports(platform)).thenReturn(true);
     }
 
     private VerificationResult activeResult(String originalTransactionId) {

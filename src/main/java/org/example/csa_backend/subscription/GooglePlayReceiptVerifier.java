@@ -22,6 +22,11 @@ public class GooglePlayReceiptVerifier implements ReceiptVerifier {
     }
 
     @Override
+    public boolean supports(Platform platform) {
+        return platform == Platform.GOOGLE;
+    }
+
+    @Override
     public VerificationResult verify(Platform platform, String purchaseToken, String productId) {
         validateRequest(platform, purchaseToken, productId);
         GooglePlaySubscriptionPurchase purchase =

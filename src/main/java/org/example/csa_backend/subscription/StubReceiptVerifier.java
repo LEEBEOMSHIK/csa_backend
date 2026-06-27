@@ -14,6 +14,11 @@ public class StubReceiptVerifier implements ReceiptVerifier {
     private static final long STUB_PERIOD_DAYS = 30;
 
     @Override
+    public boolean supports(Platform platform) {
+        return platform != null;
+    }
+
+    @Override
     public VerificationResult verify(Platform platform, String purchaseToken, String productId) {
         if (platform == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT, "플랫폼은 필수입니다.");

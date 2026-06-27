@@ -37,6 +37,16 @@ google:
   oauth:
     client-id: ""
 
+store:
+  apple:
+    bundle-id: ${APP_STORE_BUNDLE_ID:}
+    issuer-id: ${APP_STORE_ISSUER_ID:}
+    key-id: ${APP_STORE_KEY_ID:}
+    private-key: ${APP_STORE_PRIVATE_KEY:}
+    environment: ${APP_STORE_ENVIRONMENT:Production}
+    server-base-url: ${APP_STORE_SERVER_BASE_URL:https://api.storekit.itunes.apple.com}
+    root-certificates: ${APP_STORE_ROOT_CERTIFICATES:}
+
 ai:
   claude:
     api-key: ${CLAUDE_API_KEY}
