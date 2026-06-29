@@ -80,13 +80,33 @@ public class Subscription {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void updateAutoRenew(boolean autoRenew) {
+        this.autoRenew = autoRenew ? "Y" : "N";
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public boolean isActive() {
-        if (status == SubscriptionStatus.ACTIVE || status == SubscriptionStatus.GRACE) {
+        if (status == SubscriptionStatus.ACTIVE) {
+            return currentPeriodEnd == null || currentPeriodEnd.isAfter(LocalDateTime.now());
+        }
+        if (status == SubscriptionStatus.GRACE) {
             return true;
         }
         return status == SubscriptionStatus.CANCELED
                 && currentPeriodEnd != null
                 && currentPeriodEnd.isAfter(LocalDateTime.now());
+    }
+
+    public boolean isExpiredByTime() {
+        return status == SubscriptionStatus.ACTIVE
+                && currentPeriodEnd != null
+                && !currentPeriodEnd.isAfter(LocalDateTime.now());
+    }
+
+    public boolean isOlderThan(LocalDateTime notificationTime) {
+        return notificationTime != null
+                && this.updatedAt != null
+                && this.updatedAt.isAfter(notificationTime);
     }
 
     public boolean isAutoRenewEnabled() {

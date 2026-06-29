@@ -39,3 +39,18 @@ record AppleRenewalPayload(
         String productId
 ) {
 }
+
+record AppleNotificationPayload(
+        String notificationType,
+        String subtype,
+        Long signedDate,
+        AppleNotificationData data
+) {
+}
+
+record AppleNotificationData(
+        String environment,
+        String signedTransactionInfo,
+        String signedRenewalInfo
+) {
+}
