@@ -82,8 +82,10 @@ class SubscriptionNotificationApplyTest {
         Subscription sub = withId(new Subscription(
                 user, Platform.APPLE, "premium_monthly", "orig-1", StoreEnvironment.PRODUCTION), 10L);
         sub.updateFromVerification(SubscriptionStatus.ACTIVE, LocalDateTime.now().plusDays(30), true);
-        // Persisted state updated "now"; the notification claims a time in the past.
-        ReflectionTestUtils.setField(sub, "updatedAt", LocalDateTime.now());
+        // A newer notification (event-time = now) was already applied; the incoming
+        // notification claims an older event-time, so the guard must skip it. The guard
+        // is driven by last_notification_time (event-time), not updated_at (wall-clock).
+        ReflectionTestUtils.setField(sub, "lastNotificationTime", LocalDateTime.now());
 
         when(subscriptionRepository.findByOriginalTransactionId("orig-1")).thenReturn(Optional.of(sub));
 
@@ -92,6 +94,52 @@ class SubscriptionNotificationApplyTest {
                 LocalDateTime.now().minusDays(2)));
 
         assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+    }
+
+    @Test
+    void delayedProcessingDoesNotSkipNewerNotification() {
+        User user = user(1L);
+        UserSettings settings = new UserSettings(user);
+        Subscription sub = withId(new Subscription(
+                user, Platform.APPLE, "premium_monthly", "orig-1", StoreEnvironment.PRODUCTION), 10L);
+        sub.updateFromVerification(SubscriptionStatus.ACTIVE, LocalDateTime.now().plusDays(30), true);
+        // Last applied notification had an older event-time; updated_at is "now" only
+        // because processing was delayed. A newer notification must still be applied.
+        ReflectionTestUtils.setField(sub, "lastNotificationTime", LocalDateTime.now().minusDays(2));
+        ReflectionTestUtils.setField(sub, "updatedAt", LocalDateTime.now());
+
+        when(subscriptionRepository.findByOriginalTransactionId("orig-1")).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByUser(user)).thenReturn(List.of(sub));
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.of(settings));
+
+        service.applyStoreNotification(SubscriptionNotificationUpdate.state(
+                "orig-1", SubscriptionStatus.EXPIRED, LocalDateTime.now().minusDays(1), false,
+                LocalDateTime.now().minusHours(1)));
+
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        assertThat(settings.getSubscriptionTier()).isEqualTo("FREE");
+    }
+
+    @Test
+    void firstNotificationIsAppliedWhenNoPriorEventTime() {
+        User user = user(1L);
+        UserSettings settings = new UserSettings(user);
+        Subscription sub = withId(new Subscription(
+                user, Platform.APPLE, "premium_monthly", "orig-1", StoreEnvironment.PRODUCTION), 10L);
+        sub.updateFromVerification(SubscriptionStatus.ACTIVE, LocalDateTime.now().plusDays(30), true);
+        // No notification has ever been applied: last_notification_time is null.
+        assertThat(sub.getLastNotificationTime()).isNull();
+
+        when(subscriptionRepository.findByOriginalTransactionId("orig-1")).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByUser(user)).thenReturn(List.of(sub));
+        when(userSettingsRepository.findByUser(user)).thenReturn(Optional.of(settings));
+
+        LocalDateTime eventTime = LocalDateTime.now().minusDays(10);
+        service.applyStoreNotification(SubscriptionNotificationUpdate.state(
+                "orig-1", SubscriptionStatus.EXPIRED, LocalDateTime.now().minusDays(11), false, eventTime));
+
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        assertThat(sub.getLastNotificationTime()).isEqualTo(eventTime);
     }
 
     @Test

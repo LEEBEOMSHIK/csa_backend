@@ -43,6 +43,9 @@ public class Subscription {
     @Column(name = "current_period_end")
     private LocalDateTime currentPeriodEnd;
 
+    @Column(name = "last_notification_time")
+    private LocalDateTime lastNotificationTime;
+
     @Column(name = "auto_renew", nullable = false, length = 1)
     private String autoRenew = "Y";
 
@@ -105,8 +108,14 @@ public class Subscription {
 
     public boolean isOlderThan(LocalDateTime notificationTime) {
         return notificationTime != null
-                && this.updatedAt != null
-                && this.updatedAt.isAfter(notificationTime);
+                && this.lastNotificationTime != null
+                && this.lastNotificationTime.isAfter(notificationTime);
+    }
+
+    public void markNotificationApplied(LocalDateTime notificationTime) {
+        if (notificationTime != null) {
+            this.lastNotificationTime = notificationTime;
+        }
     }
 
     public boolean isAutoRenewEnabled() {

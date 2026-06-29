@@ -77,6 +77,7 @@ public class SubscriptionService {
                     update.autoRenew()
             );
         }
+        subscription.markNotificationApplied(update.notificationTime());
         recomputeTier(subscription.getUser());
     }
 

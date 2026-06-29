@@ -46,6 +46,10 @@ store:
     environment: ${APP_STORE_ENVIRONMENT:Production}
     server-base-url: ${APP_STORE_SERVER_BASE_URL:https://api.storekit.itunes.apple.com}
     root-certificates: ${APP_STORE_ROOT_CERTIFICATES:}
+  google:
+    pubsub-oidc:
+      audience: ${PUBSUB_OIDC_AUDIENCE:}
+      service-account-email: ${PUBSUB_OIDC_SERVICE_ACCOUNT_EMAIL:}
 
 ai:
   claude:
