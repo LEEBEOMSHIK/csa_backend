@@ -83,7 +83,7 @@ public class SubscriptionService {
 
     private Subscription requireOwnedBy(Subscription subscription, User user) {
         if (!subscription.getUser().getId().equals(user.getId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "다른 사용자의 구독 정보입니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
         return subscription;
     }

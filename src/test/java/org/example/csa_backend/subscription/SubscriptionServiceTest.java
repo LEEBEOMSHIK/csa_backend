@@ -97,7 +97,7 @@ class SubscriptionServiceTest {
                 service.verifyAndApply(attacker, Platform.APPLE, "token-7", "premium_monthly"))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
-                .isEqualTo(ErrorCode.FORBIDDEN);
+                .isEqualTo(ErrorCode.INVALID_INPUT);
 
         verify(subscriptionRepository, never()).save(any(Subscription.class));
     }
