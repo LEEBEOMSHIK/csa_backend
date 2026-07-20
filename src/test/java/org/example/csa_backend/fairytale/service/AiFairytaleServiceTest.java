@@ -2,6 +2,7 @@ package org.example.csa_backend.fairytale.service;
 
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
+import org.example.csa_backend.config.AiGenerationProperties;
 import org.example.csa_backend.fairytale.AiFairytale;
 import org.example.csa_backend.fairytale.AiFairytalePage;
 import org.example.csa_backend.fairytale.AiFairytalePageRepository;
@@ -10,6 +11,7 @@ import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.user.User;
 import org.example.csa_backend.user.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -17,21 +19,48 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AiFairytaleServiceTest {
 
     private final AiFairytaleRepository aiFairytaleRepository = mock(AiFairytaleRepository.class);
     private final AiFairytalePageRepository aiFairytalePageRepository = mock(AiFairytalePageRepository.class);
+    private final FileStorageService fileStorageService = mock(FileStorageService.class);
+    private final UserRepository userRepository = mock(UserRepository.class);
+    private final AiGenerationProperties aiGenerationProperties = enabledAiGenerationProperties();
     private final AiFairytaleService service = new AiFairytaleService(
             aiFairytaleRepository,
             aiFairytalePageRepository,
-            mock(AiTextService.class),
-            mock(AiImageService.class),
-            mock(AiTtsService.class),
-            mock(FileStorageService.class),
-            mock(UserRepository.class)
+            unavailableProvider(),
+            unavailableProvider(),
+            unavailableProvider(),
+            fileStorageService,
+            userRepository,
+            aiGenerationProperties
     );
+
+    @Test
+    void generateRejectsRequestsBeforePersistingWhenFeatureIsDisabled() {
+        AiGenerationProperties disabledProperties = new AiGenerationProperties();
+        AiFairytaleService disabledService = new AiFairytaleService(
+                aiFairytaleRepository,
+                aiFairytalePageRepository,
+                unavailableProvider(),
+                unavailableProvider(),
+                unavailableProvider(),
+                fileStorageService,
+                userRepository,
+                disabledProperties
+        );
+
+        assertThatThrownBy(() -> disabledService.generate(null, null))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.FEATURE_DISABLED);
+
+        verifyNoInteractions(aiFairytaleRepository, aiFairytalePageRepository, fileStorageService, userRepository);
+    }
 
     @Test
     void getMyFairytaleSlidesReturnsOwnedCompletedPages() {
@@ -140,5 +169,16 @@ class AiFairytaleServiceTest {
         ReflectionTestUtils.setField(owner, "id", ownerId);
         fairytale.assignOwner(owner);
         return fairytale;
+    }
+
+    private AiGenerationProperties enabledAiGenerationProperties() {
+        AiGenerationProperties properties = new AiGenerationProperties();
+        properties.setEnabled(true);
+        return properties;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> ObjectProvider<T> unavailableProvider() {
+        return (ObjectProvider<T>) mock(ObjectProvider.class);
     }
 }

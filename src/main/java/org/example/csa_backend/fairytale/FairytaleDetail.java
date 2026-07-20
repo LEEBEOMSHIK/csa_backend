@@ -41,6 +41,9 @@ public class FairytaleDetail extends BaseEntity {
     @Column(name = "FULL_CONTENT_JA", columnDefinition = "TEXT")
     private String fullContentJa;
 
+    @Column(name = "CONTENT_VERSION", length = 50)
+    private String contentVersion;
+
     public FairytaleDetail(Fairytale fairytale, String authorKo, String authorJa,
                            String ageRange, int durationMin, int pageCount,
                            String fullContentKo, String fullContentJa) {

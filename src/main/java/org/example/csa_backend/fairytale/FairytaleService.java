@@ -5,6 +5,9 @@ import org.example.csa_backend.fairytale.dto.CategoryDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDto;
 import org.example.csa_backend.fairytale.dto.HomePageDto;
+import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
+import org.example.csa_backend.common.exception.BusinessException;
+import org.example.csa_backend.common.exception.ErrorCode;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ public class FairytaleService {
     private final CategoryRepository categoryRepository;
     private final FairytaleRepository fairytaleRepository;
     private final FairytaleDetailRepository fairytaleDetailRepository;
+    private final CuratedFairytalePageRepository curatedFairytalePageRepository;
 
     public List<CategoryDto> getCategories() {
         return categoryRepository.findAllOrderByFairytaleCountDesc().stream()
@@ -47,9 +51,24 @@ public class FairytaleService {
     }
 
     public FairytaleDetailDto getFairytaleDetail(Long fairytaleId) {
-        FairytaleDetail detail = fairytaleDetailRepository.findByFairytaleId(fairytaleId)
+        FairytaleDetail detail = fairytaleDetailRepository.findActiveByFairytaleId(fairytaleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detail not found"));
         return FairytaleDetailDto.from(detail);
+    }
+
+    public CuratedSlidesResponse getCuratedSlides(Long fairytaleId) {
+        FairytaleDetail detail = fairytaleDetailRepository.findActiveByFairytaleId(fairytaleId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        String contentVersion = detail.getContentVersion();
+        if (contentVersion == null || contentVersion.isBlank()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        var pages = curatedFairytalePageRepository
+                .findActiveByFairytaleIdAndContentVersionOrderByPageIndexAsc(fairytaleId, contentVersion);
+        if (pages.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
+        return CuratedSlidesResponse.from(detail, pages);
     }
 
     public List<FairytaleDto> getFairytales(String categoryKey, String sort) {

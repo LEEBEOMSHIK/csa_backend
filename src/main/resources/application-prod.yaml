@@ -37,6 +37,10 @@ google:
   oauth:
     client-id: ""
 
+features:
+  ai-generation:
+    enabled: ${AI_GENERATION_ENABLED:false}
+
 store:
   apple:
     bundle-id: ${APP_STORE_BUNDLE_ID:}
@@ -53,20 +57,20 @@ store:
 
 ai:
   claude:
-    api-key: ${CLAUDE_API_KEY}
+    api-key: ${CLAUDE_API_KEY:}
     model: claude-sonnet-4-6
     base-url: https://api.anthropic.com
   dalle:
-    api-key: ${OPENAI_API_KEY}
+    api-key: ${OPENAI_API_KEY:}
     base-url: https://api.openai.com
   elevenlabs:
-    api-key: ${ELEVENLABS_API_KEY}
+    api-key: ${ELEVENLABS_API_KEY:}
     base-url: https://api.elevenlabs.io
     voice-ids:
-      dad: ${ELEVENLABS_VOICE_DAD}
-      mom: ${ELEVENLABS_VOICE_MOM}
-      grandma: ${ELEVENLABS_VOICE_GRANDMA}
-      grandpa: ${ELEVENLABS_VOICE_GRANDPA}
+      dad: ${ELEVENLABS_VOICE_DAD:}
+      mom: ${ELEVENLABS_VOICE_MOM:}
+      grandma: ${ELEVENLABS_VOICE_GRANDMA:}
+      grandpa: ${ELEVENLABS_VOICE_GRANDPA:}
 
 storage:
   mode: cdn

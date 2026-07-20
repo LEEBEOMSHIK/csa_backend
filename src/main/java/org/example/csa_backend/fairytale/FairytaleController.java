@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.fairytale.dto.CategoryDto;
+import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDto;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
@@ -47,6 +48,11 @@ public class FairytaleController {
     @GetMapping("/{id}/detail")
     public ResponseEntity<FairytaleDetailDto> getDetail(@PathVariable Long id) {
         return ResponseEntity.ok(fairytaleService.getFairytaleDetail(id));
+    }
+
+    @GetMapping("/{id}/curated-slides")
+    public ResponseEntity<CuratedSlidesResponse> getCuratedSlides(@PathVariable Long id) {
+        return ResponseEntity.ok(fairytaleService.getCuratedSlides(id));
     }
 
     @PostMapping("/generate")

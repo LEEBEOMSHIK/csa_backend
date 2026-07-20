@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
+import org.example.csa_backend.config.AiGenerationProperties;
 import org.example.csa_backend.fairytale.AiFairytale;
 import org.example.csa_backend.fairytale.AiFairytalePage;
 import org.example.csa_backend.fairytale.AiFairytalePageRepository;
@@ -12,6 +13,7 @@ import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
 import org.example.csa_backend.user.UserRepository;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,14 +27,22 @@ public class AiFairytaleService {
 
     private final AiFairytaleRepository aiFairytaleRepository;
     private final AiFairytalePageRepository aiFairytalePageRepository;
-    private final AiTextService aiTextService;
-    private final AiImageService aiImageService;
-    private final AiTtsService aiTtsService;
+    private final ObjectProvider<AiTextService> aiTextServiceProvider;
+    private final ObjectProvider<AiImageService> aiImageServiceProvider;
+    private final ObjectProvider<AiTtsService> aiTtsServiceProvider;
     private final FileStorageService fileStorageService;
     private final UserRepository userRepository;
+    private final AiGenerationProperties aiGenerationProperties;
 
     @Transactional
     public FairytaleGenerateResponse generate(FairytaleGenerateRequest request, Long userId) {
+        if (!aiGenerationProperties.isEnabled()) {
+            throw new BusinessException(ErrorCode.FEATURE_DISABLED);
+        }
+
+        AiTextService aiTextService = aiTextServiceProvider.getObject();
+        AiImageService aiImageService = aiImageServiceProvider.getObject();
+        AiTtsService aiTtsService = aiTtsServiceProvider.getObject();
         String settingsStr = String.join(",", request.settings());
 
         AiFairytale fairytale = new AiFairytale(

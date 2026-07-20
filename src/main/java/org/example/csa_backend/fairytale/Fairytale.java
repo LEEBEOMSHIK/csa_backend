@@ -49,6 +49,9 @@ public class Fairytale extends BaseEntity {
     @Column(name = "IS_RECOMMENDED", nullable = false, length = 1)
     private String isRecommended = "N";
 
+    @Column(name = "CHARACTER_SUPPORTED", nullable = false)
+    private boolean characterSupported;
+
     @ManyToMany
     @JoinTable(
         name = "FAIRYTALE_CATEGORIES",

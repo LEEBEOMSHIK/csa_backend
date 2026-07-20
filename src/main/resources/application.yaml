@@ -3,3 +3,7 @@ spring:
     name: csa_backend
   profiles:
     active: local
+
+features:
+  ai-generation:
+    enabled: false

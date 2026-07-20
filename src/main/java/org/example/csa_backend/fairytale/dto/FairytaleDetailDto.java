@@ -9,7 +9,10 @@ public record FairytaleDetailDto(
         int durationMin,
         int pageCount,
         String fullContentKo,
-        String fullContentJa
+        String fullContentJa,
+        boolean characterSupported,
+        String characterRenderMode,
+        String contentVersion
 ) {
     public static FairytaleDetailDto from(FairytaleDetail detail) {
         return new FairytaleDetailDto(
@@ -19,7 +22,10 @@ public record FairytaleDetailDto(
                 detail.getDurationMin(),
                 detail.getPageCount(),
                 detail.getFullContentKo(),
-                detail.getFullContentJa()
+                detail.getFullContentJa(),
+                detail.getFairytale().isCharacterSupported(),
+                "LOCAL_OVERLAY",
+                detail.getContentVersion()
         );
     }
 }

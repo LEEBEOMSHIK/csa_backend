@@ -13,7 +13,8 @@ public record FairytaleDto(
         Double rating,
         String colorHex,
         String themeTag,
-        List<String> categories
+        List<String> categories,
+        boolean characterSupported
 ) {
     public static FairytaleDto from(Fairytale fairytale) {
         return new FairytaleDto(
@@ -27,7 +28,8 @@ public record FairytaleDto(
                 fairytale.getThemeTag(),
                 fairytale.getCategories().stream()
                         .map(c -> c.getCategoryKey())
-                        .toList()
+                        .toList(),
+                fairytale.isCharacterSupported()
         );
     }
 }
