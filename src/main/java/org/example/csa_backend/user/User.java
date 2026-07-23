@@ -38,6 +38,12 @@ public class User {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
+    @Column(nullable = false, length = 20)
+    private String status = "ACTIVE";
+
     public User(String email, String password) {
         this.email = email;
         this.password = password;
@@ -49,5 +55,17 @@ public class User {
         this.providerId = providerId;
         this.name = name;
         this.locale = locale;
+    }
+
+    public void changeRole(String role) {
+        this.role = role;
+    }
+
+    public void suspend() {
+        this.status = "SUSPENDED";
+    }
+
+    public void activate() {
+        this.status = "ACTIVE";
     }
 }

@@ -46,6 +46,10 @@ public class OAuthService {
                     return newUser;
                 });
 
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "정지된 계정입니다.");
+        }
+
         String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getEmail());
         String rawRefreshToken = jwtProvider.generateRefreshToken(user.getId());
 

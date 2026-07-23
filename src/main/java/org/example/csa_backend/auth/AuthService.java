@@ -47,6 +47,8 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
+        assertActive(user);
+
         String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getEmail());
         String refreshToken = jwtProvider.generateRefreshToken(user.getId());
 
@@ -65,6 +67,8 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
+        assertActive(user);
+
         RefreshToken stored = refreshTokenRepository.findByUser(user)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
@@ -80,6 +84,12 @@ public class AuthService {
         saveRefreshToken(user, newRefreshToken);
 
         return new TokenResponse(newAccessToken, newRefreshToken);
+    }
+
+    private void assertActive(User user) {
+        if (!"ACTIVE".equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "정지된 계정입니다.");
+        }
     }
 
     private String hashToken(String rawToken) {

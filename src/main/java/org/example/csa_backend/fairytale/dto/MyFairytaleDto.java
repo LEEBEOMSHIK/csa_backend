@@ -15,7 +15,8 @@ public record MyFairytaleDto(
         boolean shared,
         String thumbnailUrl,
         int pageCount,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Long ownerId
 ) {
     public static MyFairytaleDto from(AiFairytale fairytale) {
         List<AiFairytalePage> pages = fairytale.getPages();
@@ -29,7 +30,8 @@ public record MyFairytaleDto(
                 fairytale.isShared(),
                 thumbnailUrl,
                 pages.size(),
-                fairytale.getCreDt()
+                fairytale.getCreDt(),
+                fairytale.getOwner() != null ? fairytale.getOwner().getId() : null
         );
     }
 }
