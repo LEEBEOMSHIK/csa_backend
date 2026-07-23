@@ -19,7 +19,7 @@ public interface AiFairytaleRepository extends JpaRepository<AiFairytale, Long> 
 
     // admin 목록 전용: q(제목/소유자 이메일)·status·shared를 각각 독립적으로 optional 취급
     @Query("select f from AiFairytale f left join fetch f.owner o where " +
-            "(:q is null or lower(f.title) like lower(concat('%', :q, '%')) or lower(o.email) like lower(concat('%', :q, '%'))) and " +
+            "(:q is null or lower(f.title) like lower(concat('%', cast(:q as string), '%')) or lower(o.email) like lower(concat('%', cast(:q as string), '%'))) and " +
             "(:status is null or f.status = :status) and " +
             "(:shared is null or f.shared = :shared) " +
             "order by f.id desc")

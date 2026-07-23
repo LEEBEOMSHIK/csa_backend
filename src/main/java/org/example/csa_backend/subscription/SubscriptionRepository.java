@@ -20,7 +20,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     // admin 목록 전용: q(사용자 이메일)·platform·status를 각각 독립적으로 optional 취급
     @Query("select s from Subscription s join fetch s.user u where " +
-            "(:q is null or lower(u.email) like lower(concat('%', :q, '%'))) and " +
+            "(:q is null or lower(u.email) like lower(concat('%', cast(:q as string), '%'))) and " +
             "(:platform is null or s.platform = :platform) and " +
             "(:status is null or s.status = :status) " +
             "order by s.id desc")
