@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.fairytale.dto.CategoryDto;
+import org.example.csa_backend.fairytale.dto.CreateDownloadLogRequest;
 import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
 import org.example.csa_backend.fairytale.dto.FairytaleDetailDto;
 import org.example.csa_backend.fairytale.dto.FairytaleDto;
@@ -26,6 +27,7 @@ public class FairytaleController {
 
     private final FairytaleService fairytaleService;
     private final AiFairytaleService aiFairytaleService;
+    private final FairytaleDownloadLogService downloadLogService;
 
     @GetMapping("/categories")
     public ResponseEntity<List<CategoryDto>> getCategories() {
@@ -93,6 +95,15 @@ public class FairytaleController {
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         aiFairytaleService.deleteMyFairytale(requireUserId(authentication), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/downloads")
+    public ResponseEntity<Void> logDownload(
+            @PathVariable Long id,
+            @RequestBody CreateDownloadLogRequest request,
+            Authentication authentication) {
+        downloadLogService.logDownload(requireUserId(authentication), id, request);
+        return ResponseEntity.ok().build();
     }
 
     private Long requireUserId(Authentication authentication) {
