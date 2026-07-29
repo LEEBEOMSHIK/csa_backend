@@ -50,6 +50,9 @@ public class AiFairytale extends BaseEntity {
     @Column(name = "SHARED", length = 1, nullable = false)
     private String shared = "N";
 
+    @Column(name = "VIDEO_URL", length = 1000)
+    private String videoUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "USER_ID")
     private User owner;
@@ -86,6 +89,10 @@ public class AiFairytale extends BaseEntity {
 
     public void updateShared(boolean shared) {
         this.shared = shared ? "Y" : "N";
+    }
+
+    public void updateVideoUrl(String videoUrl) {
+        this.videoUrl = videoUrl;
     }
 
     public boolean isShared() {

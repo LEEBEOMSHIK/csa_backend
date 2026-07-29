@@ -31,6 +31,7 @@ public class AiFairytaleService {
     private final ObjectProvider<AiImageService> aiImageServiceProvider;
     private final ObjectProvider<AiTtsService> aiTtsServiceProvider;
     private final FileStorageService fileStorageService;
+    private final AiVideoAssemblyService aiVideoAssemblyService;
     private final UserRepository userRepository;
     private final AiGenerationProperties aiGenerationProperties;
 
@@ -73,7 +74,9 @@ public class AiFairytaleService {
 
             fairytale.updateTitle(generated.title());
 
+            boolean isVideoFormat = "video".equals(fairytale.getFormat());
             List<AiFairytalePage> pages = new ArrayList<>();
+            List<AiVideoAssemblyService.PageMedia> pageMedia = new ArrayList<>();
             for (AiTextService.GeneratedPage page : generated.pages()) {
                 byte[] imageData = aiImageService.generateImage(
                         page.text(), request.useCharacter(), request.language());
@@ -89,13 +92,24 @@ public class AiFairytaleService {
                 AiFairytalePage savedPage = new AiFairytalePage(
                         fairytale, page.pageIndex(), page.text(), imageUrl, audioUrl);
                 pages.add(aiFairytalePageRepository.save(savedPage));
+
+                if (isVideoFormat) {
+                    pageMedia.add(new AiVideoAssemblyService.PageMedia(
+                            page.pageIndex(), imageData, audioData));
+                }
             }
 
             fairytale.getPages().addAll(pages);
-            fairytale.updateStatus("COMPLETED");
+
+            if (isVideoFormat) {
+                assembleAndAttachVideo(fairytale, pageMedia);
+            } else {
+                fairytale.updateStatus("COMPLETED");
+            }
             aiFairytaleRepository.save(fairytale);
 
-            log.info("AI 동화 생성 완료: id={}, title={}", fairytale.getId(), fairytale.getTitle());
+            log.info("AI 동화 생성 완료: id={}, title={}, status={}",
+                    fairytale.getId(), fairytale.getTitle(), fairytale.getStatus());
             return FairytaleGenerateResponse.from(fairytale);
 
         } catch (Exception e) {
@@ -103,6 +117,31 @@ public class AiFairytaleService {
             aiFairytaleRepository.save(fairytale);
             log.error("AI 동화 생성 실패: id={}", fairytale.getId(), e);
             throw e;
+        }
+    }
+
+    /**
+     * Assembles the mp4 for a "video" format fairytale from the page images/audio
+     * that were already generated above. Text/image/audio generation already
+     * succeeded and cost real provider calls by this point, so an assembly
+     * failure here does not discard the fairytale or its pages -- it is logged
+     * and the fairytale is marked FAILED (videoUrl stays null) so the pages
+     * remain in the DB for an admin to inspect/retry later, instead of
+     * re-throwing and losing the already-generated content.
+     */
+    private void assembleAndAttachVideo(AiFairytale fairytale, List<AiVideoAssemblyService.PageMedia> pageMedia) {
+        try {
+            byte[] videoData = aiVideoAssemblyService.assembleVideo(fairytale.getId(), pageMedia);
+            String videoUrl = fileStorageService.saveVideo(fairytale.getId(), videoData);
+            if (videoUrl == null) {
+                throw new VideoAssemblyException(
+                        "영상 파일 업로드 결과 URL이 없습니다: fairytaleId=" + fairytale.getId());
+            }
+            fairytale.updateVideoUrl(videoUrl);
+            fairytale.updateStatus("COMPLETED");
+        } catch (VideoAssemblyException e) {
+            log.error("AI 동화 영상 합성 실패 (텍스트/이미지/오디오 페이지는 보존): id={}", fairytale.getId(), e);
+            fairytale.updateStatus("FAILED");
         }
     }
 
@@ -123,7 +162,7 @@ public class AiFairytaleService {
     @Transactional(readOnly = true)
     public FairytaleGenerateResponse getMyFairytaleSlides(Long userId, Long fairytaleId) {
         AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
-        if (!"COMPLETED".equals(fairytale.getStatus())) {
+        if (!isServableAsSlides(fairytale)) {
             throw new BusinessException(ErrorCode.INVALID_STATE);
         }
         return FairytaleGenerateResponse.from(fairytale);
@@ -136,10 +175,27 @@ public class AiFairytaleService {
         if (!fairytale.isShared()) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        if (!"COMPLETED".equals(fairytale.getStatus())) {
+        if (!isServableAsSlides(fairytale)) {
             throw new BusinessException(ErrorCode.INVALID_STATE);
         }
         return FairytaleGenerateResponse.from(fairytale);
+    }
+
+    /**
+     * {@code COMPLETED} is always servable. A {@code video} format fairytale that ended up
+     * {@code FAILED} only because ffmpeg assembly failed (text/image/TTS generation already
+     * succeeded and the user already paid for that) is also servable as a slide fallback --
+     * {@code videoUrl} stays null in that response, and the frontend decides how to present it.
+     * Any other FAILED case (including a slide-format fairytale, which fails for a different
+     * reason entirely) still blocks access.
+     */
+    private boolean isServableAsSlides(AiFairytale fairytale) {
+        if ("COMPLETED".equals(fairytale.getStatus())) {
+            return true;
+        }
+        return "video".equals(fairytale.getFormat())
+                && "FAILED".equals(fairytale.getStatus())
+                && !fairytale.getPages().isEmpty();
     }
 
     @Transactional

@@ -111,6 +111,44 @@ class FileStorageServiceTest {
     }
 
     @Test
+    void saveVideoLocalModeWritesFileAndReturnsServerUrl(@TempDir Path tempDir) {
+        StorageProperties props = new StorageProperties();
+        props.setMode("local");
+        props.setLocalBasePath(tempDir.toString());
+        props.setServerBaseUrl("http://localhost:8080");
+        FileStorageService service = new FileStorageService(props, providerOf(null));
+
+        String url = service.saveVideo(7L, new byte[]{1, 2, 3, 4});
+
+        assertThat(url).isEqualTo("http://localhost:8080/files/generated-fairytales/7/video.mp4");
+        assertThat(Files.exists(tempDir.resolve("7").resolve("video.mp4"))).isTrue();
+    }
+
+    @Test
+    void saveVideoCdnModeUploadsWithVideoContentType() {
+        StorageProperties props = new StorageProperties();
+        props.setMode("cdn");
+        props.setCdnBaseUrl("https://cdn.example.com");
+        S3MediaStorageClient uploader = mock(S3MediaStorageClient.class);
+        FileStorageService service = new FileStorageService(props, providerOf(uploader));
+
+        byte[] data = new byte[]{7, 7};
+        String url = service.saveVideo(7L, data);
+
+        assertThat(url).isEqualTo("https://cdn.example.com/fairytales/7/video.mp4");
+        verify(uploader).upload("fairytales/7/video.mp4", data, "video/mp4");
+    }
+
+    @Test
+    void saveVideoReturnsNullWhenDataIsNull() {
+        StorageProperties props = new StorageProperties();
+        props.setMode("local");
+        FileStorageService service = new FileStorageService(props, providerOf(null));
+
+        assertThat(service.saveVideo(7L, null)).isNull();
+    }
+
+    @Test
     void deleteFilesCdnModeDeletesByPrefix() {
         StorageProperties props = new StorageProperties();
         props.setMode("cdn");

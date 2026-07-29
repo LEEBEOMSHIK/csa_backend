@@ -10,7 +10,8 @@ public record FairytaleGenerateResponse(
         String title,
         String language,
         String voiceType,
-        List<PageDto> pages
+        List<PageDto> pages,
+        String videoUrl
 ) {
     public record PageDto(int pageIndex, String text, String imageUrl, String audioUrl) {}
 
@@ -23,7 +24,8 @@ public record FairytaleGenerateResponse(
                 fairytale.getTitle(),
                 fairytale.getLanguage(),
                 fairytale.getVoiceType(),
-                pageDtos
+                pageDtos,
+                fairytale.getVideoUrl()
         );
     }
 }

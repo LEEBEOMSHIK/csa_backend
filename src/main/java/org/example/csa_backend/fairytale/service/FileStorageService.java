@@ -49,6 +49,17 @@ public class FileStorageService {
         return saveLocally(fairytaleId, filename, data, "generated-fairytales");
     }
 
+    public String saveVideo(Long fairytaleId, byte[] data) {
+        if (data == null) return null;
+
+        String filename = "video.mp4";
+
+        if ("cdn".equalsIgnoreCase(storageProperties.getMode())) {
+            return uploadToCdn(fairytaleId, filename, data, "video/mp4");
+        }
+        return saveLocally(fairytaleId, filename, data, "generated-fairytales");
+    }
+
     public void deleteFiles(Long fairytaleId) {
         if ("cdn".equalsIgnoreCase(storageProperties.getMode())) {
             S3MediaStorageClient client = s3ClientProvider.getIfAvailable();
