@@ -39,3 +39,6 @@ out/
 
 ### Local config ###
 **/application-local.yaml
+
+### Local tooling ###
+.claude/
