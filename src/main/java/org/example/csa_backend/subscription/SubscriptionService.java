@@ -21,15 +21,18 @@ public class SubscriptionService {
 
     private final ReceiptVerifierDispatcher receiptVerifierDispatcher;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository;
     private final UserSettingsRepository userSettingsRepository;
 
     @Transactional
     public SubscriptionDto verifyAndApply(User user, Platform platform, String purchaseToken, String productId) {
         VerificationResult result = receiptVerifierDispatcher.verify(platform, purchaseToken, productId);
 
-        Subscription subscription = subscriptionRepository
-                .findByOriginalTransactionId(result.originalTransactionId())
-                .map(existing -> requireOwnedBy(existing, user))
+        Optional<Subscription> existing =
+                subscriptionRepository.findByOriginalTransactionId(result.originalTransactionId());
+        boolean isNew = existing.isEmpty();
+        Subscription subscription = existing
+                .map(found -> requireOwnedBy(found, user))
                 .orElseGet(() -> subscriptionRepository.save(new Subscription(
                         user,
                         platform,
@@ -38,11 +41,17 @@ public class SubscriptionService {
                         result.environment()
                 )));
 
+        SubscriptionSnapshot before = SubscriptionSnapshot.of(subscription);
         subscription.updateFromVerification(
                 result.status(),
                 result.currentPeriodEnd(),
                 result.autoRenew()
         );
+        if (isNew) {
+            subscriptionHistoryRepository.save(SubscriptionHistory.created(subscription));
+        } else {
+            recordIfChanged(subscription, before, SubscriptionChangeSource.VERIFICATION);
+        }
 
         expireOtherActiveSubscriptions(user, subscription);
         recomputeTier(user);
@@ -68,6 +77,7 @@ public class SubscriptionService {
         if (subscription.isOlderThan(update.notificationTime())) {
             return;
         }
+        SubscriptionSnapshot before = SubscriptionSnapshot.of(subscription);
         if (update.autoRenewOnly()) {
             subscription.updateAutoRenew(update.autoRenew());
         } else {
@@ -78,7 +88,22 @@ public class SubscriptionService {
             );
         }
         subscription.markNotificationApplied(update.notificationTime());
+        recordIfChanged(subscription, before, SubscriptionChangeSource.STORE_NOTIFICATION);
         recomputeTier(subscription.getUser());
+    }
+
+    /**
+     * 실제로 달라진 경우에만 이력 행을 남긴다. 스토어 알림과 영수증 검증은 같은 상태로
+     * 여러 번 도착할 수 있어(재전송·중복 이벤트), 무조건 기록하면 이력이 노이즈로 찬다.
+     * lastNotificationTime/updatedAt만 갱신된 경우는 변경으로 보지 않는다.
+     */
+    private void recordIfChanged(Subscription subscription,
+                                 SubscriptionSnapshot before,
+                                 SubscriptionChangeSource source) {
+        if (before.matches(subscription)) {
+            return;
+        }
+        subscriptionHistoryRepository.save(SubscriptionHistory.changed(subscription, before, source));
     }
 
     private Subscription requireOwnedBy(Subscription subscription, User user) {
@@ -97,7 +122,9 @@ public class SubscriptionService {
         List<Subscription> subscriptions = subscriptionRepository.findByUser(user);
         for (Subscription subscription : subscriptions) {
             if (!subscription.getId().equals(current.getId()) && subscription.isActive()) {
+                SubscriptionSnapshot before = SubscriptionSnapshot.of(subscription);
                 subscription.expire();
+                recordIfChanged(subscription, before, SubscriptionChangeSource.SUPERSEDED);
             }
         }
     }
@@ -124,7 +151,9 @@ public class SubscriptionService {
     private void expireLapsedSubscriptions(List<Subscription> subscriptions) {
         for (Subscription subscription : subscriptions) {
             if (subscription.isExpiredByTime()) {
+                SubscriptionSnapshot before = SubscriptionSnapshot.of(subscription);
                 subscription.expire();
+                recordIfChanged(subscription, before, SubscriptionChangeSource.EXPIRY_SWEEP);
             }
         }
     }

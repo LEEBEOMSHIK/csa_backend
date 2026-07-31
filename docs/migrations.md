@@ -30,8 +30,8 @@
    # Windows
    .\gradlew.bat bootRun
    ```
-   기동 시 `spring-boot-docker-compose` 연동으로 Postgres가 없으면 자동으로 같이 뜨고(이미 떠 있으면 그대로 사용), Flyway가 `front` 스키마에 V1부터 현재 최신 버전(V10)까지 순서대로 적용한다.
-3. 기동이 끝나면 `front.flyway_schema_history`에 V1~V10 전부 `success = true`로 기록되어 있어야 정상이다. 클론한 두 로컬 환경이 같은 마이그레이션 파일 세트를 가지고 있다면 이 이력도 동일하게 재현된다.
+   기동 시 `spring-boot-docker-compose` 연동으로 Postgres가 없으면 자동으로 같이 뜨고(이미 떠 있으면 그대로 사용), Flyway가 `front` 스키마에 V1부터 현재 최신 버전(V11)까지 순서대로 적용한다.
+3. 기동이 끝나면 `front.flyway_schema_history`에 V1~V11 전부 `success = true`로 기록되어 있어야 정상이다. 클론한 두 로컬 환경이 같은 마이그레이션 파일 세트를 가지고 있다면 이 이력도 동일하게 재현된다.
 
 ## 3. 트러블슈팅 (요약)
 
@@ -40,7 +40,7 @@
 - **`database "xxx" does not exist`**: DB명 변경 후에도 기존 `postgres_data` 볼륨이 예전 DB명으로 이미 초기화되어 있으면 `POSTGRES_DB`가 재적용되지 않아 발생한다. `docker compose down -v` (볼륨 삭제, 데이터 손실 주의) 후 `docker compose up -d --build`로 해결한다.
 - **`down -v` 후 Entity 컬럼 누락**: `docker compose down -v` 이후 `--build` 없이 `up -d`만 하면 캐시된 구 이미지 기준으로 뜨기 때문에, 새로 추가한 마이그레이션/컬럼이 반영되지 않는다. `down -v` 이후 재기동은 **반드시 `--build`를 함께 사용**한다.
 
-## 4. 마이그레이션 이력 (V1~V10)
+## 4. 마이그레이션 이력 (V1~V11)
 
 | 버전 | 파일명 | 요약 |
 |---|---|---|
@@ -54,12 +54,13 @@
 | V8 | `V8__add_admin_audit_log.sql` | 관리자 감사 로그 테이블 `admin_audit_log`를 추가한다(`admin_user_id` FK, `admin_email`, `action`, `target_type`/`target_id`, `detail`, `created_at`). `csa_adm_backend`가 전용으로 읽고 쓰며, `csa_backend`는 마이그레이션(스키마 소유권)만 갖고 이 쪽에는 대응 Entity를 추가하지 않는다. `target_type/target_id`, `admin_user_id`, `created_at` 인덱스를 생성한다. |
 | V9 | `V9__add_fairytale_download_log.sql` | 동화 다운로드 이벤트 로그 테이블 `fairytale_download_log`를 추가한다. `target_type`(`FAIRYTALE`/`AI_FAIRYTALE`) 다형 참조에 `fairytale_id`/`ai_fairytale_id` 두 nullable FK를 두고, 타입별로 정확히 하나만 채워지도록 CHECK 제약을 건다. `format`(`slide`/`video`) CHECK 제약도 포함하며, append-only 로그라 BaseEntity 감사 컬럼 대신 단순 `created_at`만 쓴다(V8과 동일 패턴). 관련 인덱스 4개를 생성한다. |
 | V10 | `V10__add_ai_fairytale_video_url.sql` | `ai_fairytales`에 `video_url`(varchar(1000), nullable) 컬럼을 추가한다. 서버 측 ffmpeg 슬라이드+TTS 합성 결과(mp4, `format = 'video'`)의 URL을 저장하기 위함이며, 슬라이드 포맷 행이나 합성 실패 전까지의 비디오 포맷 행에서는 null이다. |
+| V11 | `V11__add_subscription_history.sql` | 구독 상태 전이 이력 테이블 `subscription_history`를 추가한다. `subscription`은 구독 1건당 1행이라 갱신 시 과거 상태가 사라지므로, 관리자 화면의 "구독 상태 변경 이력"을 위해 전이를 append-only로 남긴다. `subscription_id` FK, `previous_status`/`new_status`(`subscription.status`와 동일한 CHECK), `previous_period_end`/`new_period_end`, `previous_auto_renew`/`new_auto_renew`, `source`(`CREATED`/`VERIFICATION`/`STORE_NOTIFICATION`/`SUPERSEDED`/`EXPIRY_SWEEP` CHECK), `created_at`을 갖는다. `previous_*`는 최초 생성 행에서 null이다. append-only 로그라 BaseEntity 감사 컬럼 대신 단순 `created_at`만 쓴다(V8/V9와 동일 패턴). `(subscription_id, created_at)` 복합 인덱스와 `created_at` 인덱스를 생성한다. 쓰기는 `csa_backend`의 `SubscriptionService`가 담당하고, 조회는 `csa_adm_backend`가 맡는다. |
 
 ## 5. 새 마이그레이션 추가 규칙
 
-- 다음 버전 번호부터 시작한다 — 현재 최신은 V10이므로 다음은 **V11**.
+- 다음 버전 번호부터 시작한다 — 현재 최신은 V11이므로 다음은 **V12**.
 - 파일명 컨벤션: `V{n}__snake_case_설명.sql` (예: `V11__add_something.sql`).
-- **이미 적용된 마이그레이션 파일(V1~V10)은 절대 수정하지 않는다.** Flyway는 각 파일의 체크섬을 `flyway_schema_history`에 기록해두고 기동 시마다 비교하는데, 기존 파일 내용을 바꾸면 체크섬이 달라져 애플리케이션 기동이 실패한다. 스키마를 고치고 싶다면 새 버전 파일로 `ALTER`를 추가한다.
+- **이미 적용된 마이그레이션 파일은 절대 수정하지 않는다.** Flyway는 각 파일의 체크섬을 `flyway_schema_history`에 기록해두고 기동 시마다 비교하는데, 기존 파일 내용을 바꾸면 체크섬이 달라져 애플리케이션 기동이 실패한다. 스키마를 고치고 싶다면 새 버전 파일로 `ALTER`를 추가한다.
 - 컬럼/테이블명은 언더스코어 스네이크케이스 소문자로 작성한다 (`db-guidelines.md` 원칙과 달리 이 저장소의 실제 마이그레이션은 Hibernate의 `PhysicalNamingStrategySnakeCaseImpl` 기본 동작에 맞춰 소문자 unquoted 식별자를 사용한다 — 각 마이그레이션 파일 상단 주석 참고).
 - `NOT NULL` 컬럼을 기존 테이블에 추가할 때는 기존 데이터를 위해 `DEFAULT` 값을 지정한다 (V6 참고).
 - 마이그레이션 작성 후에는 대응하는 JPA Entity를 함께 갱신해 `ddl-auto: validate`가 통과하는지 확인한다.

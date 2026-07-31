@@ -17,12 +17,14 @@ import static org.mockito.Mockito.when;
 class SubscriptionNotificationApplyTest {
 
     private final SubscriptionRepository subscriptionRepository = mock(SubscriptionRepository.class);
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository =
+            mock(SubscriptionHistoryRepository.class);
     private final UserSettingsRepository userSettingsRepository = mock(UserSettingsRepository.class);
     private final ReceiptVerifierDispatcher dispatcher =
             new ReceiptVerifierDispatcher(List.of());
 
     private final SubscriptionService service = new SubscriptionService(
-            dispatcher, subscriptionRepository, userSettingsRepository);
+            dispatcher, subscriptionRepository, subscriptionHistoryRepository, userSettingsRepository);
 
     @Test
     void unknownSubscriptionIsIgnored() {

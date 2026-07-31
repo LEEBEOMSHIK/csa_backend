@@ -24,13 +24,15 @@ import static org.mockito.Mockito.when;
 class SubscriptionServiceTest {
 
     private final SubscriptionRepository subscriptionRepository = mock(SubscriptionRepository.class);
+    private final SubscriptionHistoryRepository subscriptionHistoryRepository =
+            mock(SubscriptionHistoryRepository.class);
     private final UserSettingsRepository userSettingsRepository = mock(UserSettingsRepository.class);
     private final ReceiptVerifier verifier = mock(ReceiptVerifier.class);
     private final ReceiptVerifierDispatcher dispatcher =
             new ReceiptVerifierDispatcher(List.of(verifier));
 
     private final SubscriptionService service = new SubscriptionService(
-            dispatcher, subscriptionRepository, userSettingsRepository);
+            dispatcher, subscriptionRepository, subscriptionHistoryRepository, userSettingsRepository);
 
     @Test
     void verifyAndApplyCreatesNewSubscriptionAndPromotesTier() {
@@ -162,7 +164,8 @@ class SubscriptionServiceTest {
     void verifyAndApplyRejectsWhenVerifierAbsent() {
         User user = user(1L);
         SubscriptionService emptyService = new SubscriptionService(
-                new ReceiptVerifierDispatcher(List.of()), subscriptionRepository, userSettingsRepository);
+                new ReceiptVerifierDispatcher(List.of()), subscriptionRepository,
+                subscriptionHistoryRepository, userSettingsRepository);
 
         assertThatThrownBy(() ->
                 emptyService.verifyAndApply(user, Platform.APPLE, "token-1", "premium_monthly"))
