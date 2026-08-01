@@ -372,6 +372,52 @@ class AiFairytaleServiceTest {
         verifyNoInteractions(aiVideoAssemblyService);
     }
 
+    /// format은 클라이언트가 보낸 값을 그대로 저장해 왔고, 그래서 아직 설치되어 있는
+    /// 구버전 앱이 보낸 "IMAGE" 같은 값이 컬럼에 남아 관리자 형식 분포에서 별개 항목으로
+    /// 잡혔다. 저장 시점에 slide/video로 정규화되는지 고정한다.
+    @Test
+    void generateNormalizesUnknownFormatToSlide() {
+        assertThat(savedFormatFor("IMAGE")).isEqualTo("slide");
+        assertThat(savedFormatFor(null)).isEqualTo("slide");
+        assertThat(savedFormatFor("  ")).isEqualTo("slide");
+    }
+
+    @Test
+    void generateAcceptsVideoFormatRegardlessOfSpelling() {
+        assertThat(savedFormatFor("video")).isEqualTo("video");
+        assertThat(savedFormatFor("VIDEO")).isEqualTo("video");
+        assertThat(savedFormatFor(" Video ")).isEqualTo("video");
+    }
+
+    /// 요청한 format으로 생성을 시도한 뒤, 저장된 엔티티에 실제로 들어간 값을 돌려준다.
+    /// AI 호출은 스텁하지 않으므로 뒤에서 실패하지만, 정규화는 그 전에 끝나 있다.
+    private String savedFormatFor(String requestedFormat) {
+        AiFairytaleRepository repository = mock(AiFairytaleRepository.class);
+        AiFairytaleService service = new AiFairytaleService(
+                repository,
+                aiFairytalePageRepository,
+                providerOf(mock(AiTextService.class)),
+                providerOf(mock(AiImageService.class)),
+                providerOf(mock(AiTtsService.class)),
+                fileStorageService,
+                aiVideoAssemblyService,
+                userRepository,
+                aiGenerationProperties
+        );
+
+        try {
+            service.generate(new FairytaleGenerateRequest(
+                    List.of("adventure"), "classic", "courage", 1, false, "dad", "ko",
+                    requestedFormat), 11L);
+        } catch (RuntimeException ignored) {
+            // 생성 파이프라인의 실패는 이 테스트의 관심사가 아니다.
+        }
+
+        ArgumentCaptor<AiFairytale> saved = ArgumentCaptor.forClass(AiFairytale.class);
+        verify(repository, atLeastOnce()).save(saved.capture());
+        return saved.getAllValues().get(0).getFormat();
+    }
+
     private FairytaleGenerateRequest videoRequest() {
         return new FairytaleGenerateRequest(
                 List.of("adventure"), "classic", "courage", 1, false, "dad", "ko", "video");

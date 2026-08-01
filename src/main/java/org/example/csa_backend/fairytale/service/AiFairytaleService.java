@@ -9,6 +9,7 @@ import org.example.csa_backend.fairytale.AiFairytale;
 import org.example.csa_backend.fairytale.AiFairytalePage;
 import org.example.csa_backend.fairytale.AiFairytalePageRepository;
 import org.example.csa_backend.fairytale.AiFairytaleRepository;
+import org.example.csa_backend.fairytale.FairytaleDownloadLog;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
@@ -54,7 +55,7 @@ public class AiFairytaleService {
                 request.chapterCount(),
                 request.voiceType(),
                 request.language(),
-                request.format() != null ? request.format() : "slide",
+                normalizeFormat(request.format()),
                 "GENERATING"
         );
         if (userId != null) {
@@ -210,6 +211,26 @@ public class AiFairytaleService {
         AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
         aiFairytaleRepository.delete(fairytale);
         fileStorageService.deleteFiles(fairytaleId);
+    }
+
+    /**
+     * Normalizes the client-supplied format to the two values the app understands.
+     *
+     * <p>The raw value used to be stored as-is, which let a caller write "IMAGE" into the column;
+     * it then showed up as its own slice in the admin format chart. Every downstream check is
+     * {@code "video".equals(format)}, so anything that is not video already behaves as slides —
+     * we store that intent instead of the caller's spelling.
+     *
+     * <p>Deliberately coercing rather than rejecting: the stray values came from older app
+     * builds that are still installed, and failing their creation request with a 400 would break
+     * a flow that works fine today. {@code FairytaleDownloadLogService} validates strictly
+     * instead, because that endpoint was added after the format values were settled.
+     */
+    private static String normalizeFormat(String format) {
+        return FairytaleDownloadLog.FORMAT_VIDEO.equalsIgnoreCase(
+                format != null ? format.trim() : null)
+                ? FairytaleDownloadLog.FORMAT_VIDEO
+                : FairytaleDownloadLog.FORMAT_SLIDE;
     }
 
     private AiFairytale getOwnedFairytale(Long userId, Long fairytaleId) {
