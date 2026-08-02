@@ -30,8 +30,32 @@
    # Windows
    .\gradlew.bat bootRun
    ```
-   기동 시 `spring-boot-docker-compose` 연동으로 Postgres가 없으면 자동으로 같이 뜨고(이미 떠 있으면 그대로 사용), Flyway가 `front` 스키마에 V1부터 현재 최신 버전(V11)까지 순서대로 적용한다.
-3. 기동이 끝나면 `front.flyway_schema_history`에 V1~V11 전부 `success = true`로 기록되어 있어야 정상이다. 클론한 두 로컬 환경이 같은 마이그레이션 파일 세트를 가지고 있다면 이 이력도 동일하게 재현된다.
+   기동 시 `spring-boot-docker-compose` 연동으로 Postgres가 없으면 자동으로 같이 뜨고(이미 떠 있으면 그대로 사용), Flyway가 `front` 스키마에 V1부터 현재 최신 버전(V12)까지 순서대로 적용한다.
+3. 기동이 끝나면 `front.flyway_schema_history`에 V1~V12 전부 `success = true`로 기록되어 있어야 정상이다. 클론한 두 로컬 환경이 같은 마이그레이션 파일 세트를 가지고 있다면 이 이력도 동일하게 재현된다.
+
+4. 확인 쿼리 — 두 환경이 같은 상태인지 비교할 때 쓴다.
+   ```bash
+   docker exec csa_backend-postgres-1 psql -U myuser -d csa -c      "select version, description, success from front.flyway_schema_history order by installed_rank;"
+   ```
+
+### 2-1. 다른 컴퓨터에서 이어받을 때 (스키마 외 준비물)
+
+마이그레이션만 맞추면 스키마는 같아지지만, 실제로 화면까지 띄우려면 아래가 더 필요하다.
+
+- **`application-local.yaml`은 git에 없다**(`.gitignore`). `csa_backend`/`csa_adm_backend` 각각 새로 만들어야 한다.
+  `csa_adm_backend`는 `README.md`의 "사전 준비"에 최소 내용이 적혀 있다.
+- **`csa_adm_backend`는 자체 DB 컨테이너를 띄우지 않는다.** `csa_backend`가 관리하는
+  `csa_backend-postgres-1`(`localhost:15432`)를 그대로 바라보므로 **`csa_backend`를 먼저 기동**해야 한다.
+  스키마 소유권도 `csa_backend`에 있어 `csa_adm_backend`에는 Flyway 자체가 없고 `ddl-auto: validate`만 쓴다.
+- **관리자 계정은 마이그레이션이 만들어주지 않는다.** 회원가입 후 DB에서 승격해야 관리자 사이트에 로그인할 수 있다.
+  ```sql
+  update front.users set role = 'ADMIN' where email = '<가입한 이메일>';
+  ```
+- **`csa_adm_backend` 테스트는 DB 없이 돈다**(H2). 단 `postgresTest` 태스크는 실 Postgres가 필요하다.
+  자세한 구분은 `csa_adm_backend/README.md` 참고.
+- **Flutter 프로젝트에서 `flutter pub get`은 `lib/l10n`의 생성 파일을 지운다.** 지워졌으면
+  `flutter gen-l10n`으로 다시 만들어야 `AppLocalizations` 관련 컴파일 오류가 사라진다. `flutter run`이
+  암묵적으로 pub get을 돌리기도 하므로, 생성 파일을 복구한 직후에는 `flutter run --no-pub`를 쓰면 안전하다.
 
 ## 3. 트러블슈팅 (요약)
 
@@ -40,7 +64,40 @@
 - **`database "xxx" does not exist`**: DB명 변경 후에도 기존 `postgres_data` 볼륨이 예전 DB명으로 이미 초기화되어 있으면 `POSTGRES_DB`가 재적용되지 않아 발생한다. `docker compose down -v` (볼륨 삭제, 데이터 손실 주의) 후 `docker compose up -d --build`로 해결한다.
 - **`down -v` 후 Entity 컬럼 누락**: `docker compose down -v` 이후 `--build` 없이 `up -d`만 하면 캐시된 구 이미지 기준으로 뜨기 때문에, 새로 추가한 마이그레이션/컬럼이 반영되지 않는다. `down -v` 이후 재기동은 **반드시 `--build`를 함께 사용**한다.
 
-## 4. 마이그레이션 이력 (V1~V11)
+### 3-1. `Migration checksum mismatch for migration version N`
+
+**증상**: 애플리케이션이 기동하다 `FlywayValidateException: Validate failed: Migrations have failed validation` /
+`Migration checksum mismatch for migration version N`으로 죽는다. 이어서 `entityManagerFactory` 생성 실패가
+줄줄이 뜨지만 원인은 맨 아래 Flyway 메시지 하나다.
+
+**원인**: 이미 적용된 마이그레이션 파일의 **내용이 바뀌었다.** Flyway는 적용 시점의 체크섬을
+`front.flyway_schema_history`에 저장해두고 기동할 때마다 파일과 비교한다. 주석 한 줄만 고쳐도 체크섬이 달라진다.
+
+**어느 환경에서 터지나**: 그 버전을 **이미 적용한** DB에서만 터진다. 새로 클론해서 처음부터 적용하는 환경은
+최종본을 그대로 적용하므로 아무 문제가 없다. 즉 "내 로컬만 안 뜨고 남은 잘 뜨는" 형태로 나타난다.
+
+**확인**:
+```bash
+docker exec csa_backend-postgres-1 psql -U myuser -d csa   -c "select version, description, checksum, success from front.flyway_schema_history order by installed_rank desc limit 5;"
+```
+
+**해결** — 아래 중 하나를 고른다.
+
+1. **바뀐 내용이 데이터/스키마에 영향이 없고(주석·공백 등) 해당 마이그레이션이 멱등이면**, 이력 행을 지우고 재적용한다.
+   재적용해도 결과가 같다는 것을 먼저 확인한다(예: `UPDATE 0`).
+   ```bash
+   docker exec csa_backend-postgres-1 psql -U myuser -d csa      -c "delete from front.flyway_schema_history where version='N';"
+   ```
+   이후 `./gradlew bootRun`으로 재기동하면 새 체크섬으로 다시 기록된다.
+
+2. **멱등이 아니거나 이미 데이터가 바뀐 뒤라면** 파일을 원래 내용으로 되돌리고, 고치고 싶은 부분은 새 버전(V{N+1})으로 만든다.
+
+3. **로컬 데이터를 버려도 되면** `docker compose down -v && docker compose up -d --build`로 처음부터 다시 만든다.
+
+> `spring.flyway.validate-on-migrate: false`로 넘기지 않는다. 체크섬 검증은 "내 DB 스키마가 코드가 가정하는 것과
+> 같은가"를 지켜주는 장치라, 끄면 이후의 진짜 불일치도 조용히 지나간다.
+
+## 4. 마이그레이션 이력 (V1~V12)
 
 | 버전 | 파일명 | 요약 |
 |---|---|---|
@@ -55,10 +112,11 @@
 | V9 | `V9__add_fairytale_download_log.sql` | 동화 다운로드 이벤트 로그 테이블 `fairytale_download_log`를 추가한다. `target_type`(`FAIRYTALE`/`AI_FAIRYTALE`) 다형 참조에 `fairytale_id`/`ai_fairytale_id` 두 nullable FK를 두고, 타입별로 정확히 하나만 채워지도록 CHECK 제약을 건다. `format`(`slide`/`video`) CHECK 제약도 포함하며, append-only 로그라 BaseEntity 감사 컬럼 대신 단순 `created_at`만 쓴다(V8과 동일 패턴). 관련 인덱스 4개를 생성한다. |
 | V10 | `V10__add_ai_fairytale_video_url.sql` | `ai_fairytales`에 `video_url`(varchar(1000), nullable) 컬럼을 추가한다. 서버 측 ffmpeg 슬라이드+TTS 합성 결과(mp4, `format = 'video'`)의 URL을 저장하기 위함이며, 슬라이드 포맷 행이나 합성 실패 전까지의 비디오 포맷 행에서는 null이다. |
 | V11 | `V11__add_subscription_history.sql` | 구독 상태 전이 이력 테이블 `subscription_history`를 추가한다. `subscription`은 구독 1건당 1행이라 갱신 시 과거 상태가 사라지므로, 관리자 화면의 "구독 상태 변경 이력"을 위해 전이를 append-only로 남긴다. `subscription_id` FK, `previous_status`/`new_status`(`subscription.status`와 동일한 CHECK), `previous_period_end`/`new_period_end`, `previous_auto_renew`/`new_auto_renew`, `source`(`CREATED`/`VERIFICATION`/`STORE_NOTIFICATION`/`SUPERSEDED`/`EXPIRY_SWEEP` CHECK), `created_at`을 갖는다. `previous_*`는 최초 생성 행에서 null이다. append-only 로그라 BaseEntity 감사 컬럼 대신 단순 `created_at`만 쓴다(V8/V9와 동일 패턴). `(subscription_id, created_at)` 복합 인덱스와 `created_at` 인덱스를 생성한다. 쓰기는 `csa_backend`의 `SubscriptionService`가 담당하고, 조회는 `csa_adm_backend`가 맡는다. |
+| V12 | `V12__normalize_ai_fairytale_format.sql` | `ai_fairytales.format` 값을 `slide`/`video` 두 가지로 정규화한다. 생성 API가 클라이언트가 보낸 `format`을 검증 없이 저장해 와서, 아직 설치되어 있는 구버전 앱이 보낸 대문자 레거시 값(`IMAGE`)이 섞여 있었고 관리자 대시보드의 형식 분포에서 별개 항목으로 잡혔다. 앱 로직이 이미 `"video".equals(format)`(= video가 아니면 슬라이드)로 동작하므로 비-video 값을 전부 `slide`로 바꾼다 — 정보 손실은 없다. 재유입 방지는 `AiFairytaleService.normalizeFormat`이 맡는다(거부가 아니라 정규화: 400으로 막으면 구버전 앱의 동화 생성이 깨진다). **데이터만 바꾸는 마이그레이션이라 스키마 변경은 없다.** |
 
 ## 5. 새 마이그레이션 추가 규칙
 
-- 다음 버전 번호부터 시작한다 — 현재 최신은 V11이므로 다음은 **V12**.
+- 다음 버전 번호부터 시작한다 — 현재 최신은 V12이므로 다음은 **V13**.
 - 파일명 컨벤션: `V{n}__snake_case_설명.sql` (예: `V11__add_something.sql`).
 - **이미 적용된 마이그레이션 파일은 절대 수정하지 않는다.** Flyway는 각 파일의 체크섬을 `flyway_schema_history`에 기록해두고 기동 시마다 비교하는데, 기존 파일 내용을 바꾸면 체크섬이 달라져 애플리케이션 기동이 실패한다. 스키마를 고치고 싶다면 새 버전 파일로 `ALTER`를 추가한다.
 - 컬럼/테이블명은 언더스코어 스네이크케이스 소문자로 작성한다 (`db-guidelines.md` 원칙과 달리 이 저장소의 실제 마이그레이션은 Hibernate의 `PhysicalNamingStrategySnakeCaseImpl` 기본 동작에 맞춰 소문자 unquoted 식별자를 사용한다 — 각 마이그레이션 파일 상단 주석 참고).
