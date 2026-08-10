@@ -8,6 +8,8 @@ import org.example.csa_backend.fairytale.dto.HomePageDto;
 import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
+import org.example.csa_backend.storycontent.LegacyStoryLinkRepository;
+import org.example.csa_backend.storycontent.LegacyType;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class FairytaleService {
     private final FairytaleRepository fairytaleRepository;
     private final FairytaleDetailRepository fairytaleDetailRepository;
     private final CuratedFairytalePageRepository curatedFairytalePageRepository;
+    private final LegacyStoryLinkRepository legacyStoryLinkRepository;
 
     public List<CategoryDto> getCategories() {
         return categoryRepository.findAllOrderByFairytaleCountDesc().stream()
@@ -36,15 +39,15 @@ public class FairytaleService {
         String key = (categoryKey != null && !categoryKey.isBlank()) ? categoryKey : null;
 
         List<FairytaleDto> themes = fairytaleRepository.findThemes(key).stream()
-                .map(FairytaleDto::from)
+                .map(this::toDto)
                 .toList();
 
         List<FairytaleDto> newItems = fairytaleRepository.findNewItems(key).stream()
-                .map(FairytaleDto::from)
+                .map(this::toDto)
                 .toList();
 
         List<FairytaleDto> recommended = fairytaleRepository.findRecommended(key).stream()
-                .map(FairytaleDto::from)
+                .map(this::toDto)
                 .toList();
 
         return new HomePageDto(themes, newItems, recommended);
@@ -74,8 +77,16 @@ public class FairytaleService {
     public List<FairytaleDto> getFairytales(String categoryKey, String sort) {
         String key = (categoryKey != null && !categoryKey.isBlank()) ? categoryKey : null;
         return fairytaleRepository.findCurated(key, resolveSort(sort)).stream()
-                .map(FairytaleDto::from)
+                .map(this::toDto)
                 .toList();
+    }
+
+    private FairytaleDto toDto(Fairytale fairytale) {
+        Long canonicalStoryId = legacyStoryLinkRepository
+                .findByLegacyTypeAndLegacyId(LegacyType.CURATED, fairytale.getId())
+                .map(link -> link.getStoryId())
+                .orElse(null);
+        return FairytaleDto.from(fairytale, canonicalStoryId);
     }
 
     private Sort resolveSort(String sort) {

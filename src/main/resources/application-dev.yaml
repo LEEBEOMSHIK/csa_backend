@@ -55,3 +55,18 @@ storage:
   mode: local
   local-base-path: C:/project/csa/generated-fairytales
   server-base-url: ${DEV_SERVER_BASE_URL:http://localhost:8080}
+
+csa:
+  media:
+    storage-mode: ${CSA_MEDIA_STORAGE_MODE}
+    storage-root: ${CSA_MEDIA_STORAGE_ROOT}
+    bucket: ${CSA_MEDIA_BUCKET}
+    prefix: ${CSA_MEDIA_PREFIX}
+    public-base-url: ${CSA_MEDIA_PUBLIC_BASE_URL}
+    ffprobe-path: ${CSA_MEDIA_FFPROBE_PATH}
+    probe-timeout-ms: ${CSA_MEDIA_PROBE_TIMEOUT_MS}
+    clamav:
+      host: ${CSA_CLAMAV_HOST}
+      port: ${CSA_CLAMAV_PORT}
+      connect-timeout-ms: ${CSA_CLAMAV_CONNECT_TIMEOUT_MS}
+      read-timeout-ms: ${CSA_CLAMAV_READ_TIMEOUT_MS}

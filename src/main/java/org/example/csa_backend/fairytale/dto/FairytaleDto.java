@@ -14,9 +14,14 @@ public record FairytaleDto(
         String colorHex,
         String themeTag,
         List<String> categories,
-        boolean characterSupported
+        boolean characterSupported,
+        Long canonicalStoryId
 ) {
     public static FairytaleDto from(Fairytale fairytale) {
+        return from(fairytale, null);
+    }
+
+    public static FairytaleDto from(Fairytale fairytale, Long canonicalStoryId) {
         return new FairytaleDto(
                 fairytale.getId(),
                 fairytale.getTitle(),
@@ -29,7 +34,8 @@ public record FairytaleDto(
                 fairytale.getCategories().stream()
                         .map(c -> c.getCategoryKey())
                         .toList(),
-                fairytale.isCharacterSupported()
+                fairytale.isCharacterSupported(),
+                canonicalStoryId
         );
     }
 }

@@ -7,3 +7,41 @@ spring:
 features:
   ai-generation:
     enabled: false
+
+csa:
+  media:
+    storage-mode: ${CSA_MEDIA_STORAGE_MODE}
+    storage-root: ${CSA_MEDIA_STORAGE_ROOT}
+    bucket: ${CSA_MEDIA_BUCKET}
+    prefix: ${CSA_MEDIA_PREFIX}
+    public-base-url: ${CSA_MEDIA_PUBLIC_BASE_URL}
+    ffprobe-path: ${CSA_MEDIA_FFPROBE_PATH}
+    probe-timeout-ms: ${CSA_MEDIA_PROBE_TIMEOUT_MS}
+    image-max-width: ${CSA_MEDIA_IMAGE_MAX_WIDTH:8192}
+    image-max-height: ${CSA_MEDIA_IMAGE_MAX_HEIGHT:8192}
+    image-max-pixels: ${CSA_MEDIA_IMAGE_MAX_PIXELS:40000000}
+    clamav:
+      host: ${CSA_CLAMAV_HOST}
+      port: ${CSA_CLAMAV_PORT}
+      connect-timeout-ms: ${CSA_CLAMAV_CONNECT_TIMEOUT_MS}
+      read-timeout-ms: ${CSA_CLAMAV_READ_TIMEOUT_MS}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+csa:
+  media:
+    storage-mode: ${CSA_MEDIA_STORAGE_MODE:local}
+    storage-root: ${CSA_MEDIA_STORAGE_ROOT:uploads}
+    bucket: ${CSA_MEDIA_BUCKET:}
+    prefix: ${CSA_MEDIA_PREFIX:}
+    public-base-url: ${CSA_MEDIA_PUBLIC_BASE_URL:http://localhost:18080/uploads}
+    ffprobe-path: ${CSA_MEDIA_FFPROBE_PATH:ffprobe}
+    probe-timeout-ms: ${CSA_MEDIA_PROBE_TIMEOUT_MS:5000}
+    clamav:
+      host: ${CSA_CLAMAV_HOST:localhost}
+      port: ${CSA_CLAMAV_PORT:13310}
+      connect-timeout-ms: ${CSA_CLAMAV_CONNECT_TIMEOUT_MS:5000}
+      read-timeout-ms: ${CSA_CLAMAV_READ_TIMEOUT_MS:5000}

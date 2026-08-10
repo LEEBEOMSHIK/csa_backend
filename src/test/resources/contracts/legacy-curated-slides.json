@@ -1,0 +1,24 @@
+{
+  "input": {
+    "fairytaleId": 12,
+    "contentVersion": "2026-07-20.1",
+    "characterSupported": true,
+    "pages": [{
+      "pageIndex": 1,
+      "imageUrl": "https://cdn.example/curated/12/2026-07-20.1/page-1.png",
+      "textKo": "한국어 본문", "textJa": "日本語の本文",
+      "placementX": 0.18, "placementY": 0.42, "placementWidth": 0.24, "placementHeight": 0.36,
+      "placementZIndex": 2, "placementPose": "standing", "placementFlipX": false,
+      "audios": [{"voiceType": "dad", "locale": "ko", "audioUrl": "https://cdn.example/curated/12/2026-07-20.1/page-1-dad-ko.mp3"}, {"voiceType": "dad", "locale": "ja", "audioUrl": "https://cdn.example/curated/12/2026-07-20.1/page-1-dad-ja.mp3"}]
+    }]
+  },
+  "expected": {
+    "fairytaleId": 12, "contentVersion": "2026-07-20.1", "characterSupported": true, "characterRenderMode": "LOCAL_OVERLAY",
+    "pages": [{
+      "pageIndex": 1, "imageUrl": "https://cdn.example/curated/12/2026-07-20.1/page-1.png",
+      "text": {"ko": "한국어 본문", "ja": "日本語の本文"},
+      "audioUrls": {"dad": {"ko": "https://cdn.example/curated/12/2026-07-20.1/page-1-dad-ko.mp3", "ja": "https://cdn.example/curated/12/2026-07-20.1/page-1-dad-ja.mp3"}},
+      "characterPlacement": {"x": 0.18, "y": 0.42, "width": 0.24, "height": 0.36, "zIndex": 2, "pose": "standing", "flipX": false}
+    }]
+  }
+}

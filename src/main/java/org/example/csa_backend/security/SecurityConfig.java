@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.common.response.ApiResponse;
 import org.example.csa_backend.jwt.JwtAuthenticationFilter;
+import org.example.csa_backend.storycontent.PublishedMediaRoute;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -30,6 +32,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ObjectMapper objectMapper;
+    private final PublishedMediaRoute publishedMediaRoute;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -41,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/fairytale/**").permitAll()
                         .requestMatchers("/subscriptions/notifications/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/stories/*/runtime").permitAll()
+                        .requestMatchers(HttpMethod.GET, publishedMediaRoute.requestPattern()).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

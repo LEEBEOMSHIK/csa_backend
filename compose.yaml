@@ -25,9 +25,29 @@ services:
       - SERVER_PORT=18080
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/csa
       - SPRING_DOCKER_COMPOSE_LIFECYCLE-MANAGEMENT=none
+      - CSA_MEDIA_STORAGE_MODE=local
+      - CSA_MEDIA_STORAGE_ROOT=/app/uploads
+      - CSA_MEDIA_PUBLIC_BASE_URL=http://localhost:18080/uploads
+      - CSA_CLAMAV_HOST=clamav
+      - CSA_CLAMAV_PORT=3310
+      - CSA_CLAMAV_CONNECT_TIMEOUT_MS=5000
+      - CSA_CLAMAV_READ_TIMEOUT_MS=5000
+    volumes:
+      - ./uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
+      clamav:
+        condition: service_healthy
+
+  clamav:
+    image: 'clamav/clamav:1.5.3'
+    environment:
+      - CLAMD_CONF_StreamMaxLength=525M
+      - CLAMD_CONF_MaxFileSize=525M
+      - CLAMD_CONF_MaxScanSize=525M
+    ports:
+      - '127.0.0.1:13310:3310'
 
 volumes:
   postgres_data:

@@ -22,7 +22,8 @@ class FairytaleServiceTest {
             mock(CategoryRepository.class),
             mock(FairytaleRepository.class),
             fairytaleDetailRepository,
-            curatedFairytalePageRepository
+            curatedFairytalePageRepository,
+            mock(org.example.csa_backend.storycontent.LegacyStoryLinkRepository.class)
     );
 
     @Test

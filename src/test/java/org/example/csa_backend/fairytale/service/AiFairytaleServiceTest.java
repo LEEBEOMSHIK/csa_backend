@@ -9,6 +9,7 @@ import org.example.csa_backend.fairytale.AiFairytalePageRepository;
 import org.example.csa_backend.fairytale.AiFairytaleRepository;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
+import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
 import org.example.csa_backend.user.User;
 import org.example.csa_backend.user.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,14 @@ class AiFairytaleServiceTest {
     }
 
     @Test
+    void ownerMismatchRemainsForbidden() {
+        AiFairytale fairytale = completedFairytale(99L, 11L);
+        when(aiFairytaleRepository.findById(99L)).thenReturn(Optional.of(fairytale));
+
+        assertApiFailure(() -> service.getMyFairytaleSlides(7L, 99L), 403, ErrorCode.FORBIDDEN);
+    }
+
+    @Test
     void getMyFairytaleSlidesRejectsIncompleteFairytale() {
         AiFairytale fairytale = completedFairytale(7L, 11L);
         fairytale.updateStatus("GENERATING");
@@ -119,6 +128,15 @@ class AiFairytaleServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INVALID_STATE);
+    }
+
+    @Test
+    void incompleteOwnerSlidesRemainsInvalidState() {
+        AiFairytale fairytale = completedFairytale(10L, 7L);
+        fairytale.updateStatus("PENDING");
+        when(aiFairytaleRepository.findById(10L)).thenReturn(Optional.of(fairytale));
+
+        assertApiFailure(() -> service.getMyFairytaleSlides(7L, 10L), 409, ErrorCode.INVALID_STATE);
     }
 
     @Test
@@ -151,6 +169,72 @@ class AiFairytaleServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void privateSharedLookupRemainsNotFound() {
+        AiFairytale fairytale = completedFairytale(7L, 11L);
+        when(aiFairytaleRepository.findById(7L)).thenReturn(Optional.of(fairytale));
+
+        assertApiFailure(() -> service.getSharedFairytaleSlides(7L), 404, ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void sharedListContainsOnlySharedCompletedRows() {
+        AiFairytale newest = completedFairytale(3L, 11L);
+        newest.updateShared(true);
+        AiFairytale oldest = completedFairytale(1L, 11L);
+        oldest.updateShared(true);
+        when(aiFairytaleRepository.findBySharedAndStatusOrderByIdDesc("Y", "COMPLETED"))
+                .thenReturn(List.of(newest, oldest));
+
+        assertThat(service.getSharedFairytales()).extracting(MyFairytaleDto::id).containsExactly(3L, 1L);
+    }
+
+    @Test
+    void ownerShareToggleReturnsUpdatedState() {
+        AiFairytale fairytale = completedFairytale(20L, 11L);
+        when(aiFairytaleRepository.findById(20L)).thenReturn(Optional.of(fairytale));
+
+        assertThat(service.toggleShare(11L, 20L)).isTrue();
+        assertThat(fairytale.isShared()).isTrue();
+    }
+
+    @Test
+    void nonOwnerShareRejectsWithoutChangingPrivateOrSharedState() {
+        AiFairytale privateFairytale = completedFairytale(20L, 11L);
+        AiFairytale sharedFairytale = completedFairytale(22L, 11L);
+        sharedFairytale.updateShared(true);
+        when(aiFairytaleRepository.findById(20L)).thenReturn(Optional.of(privateFairytale));
+        when(aiFairytaleRepository.findById(22L)).thenReturn(Optional.of(sharedFairytale));
+
+        assertApiFailure(() -> service.toggleShare(7L, 20L), 403, ErrorCode.FORBIDDEN);
+        assertThat(privateFairytale.isShared()).isFalse();
+
+        assertApiFailure(() -> service.toggleShare(7L, 22L), 403, ErrorCode.FORBIDDEN);
+        assertThat(sharedFairytale.isShared()).isTrue();
+    }
+
+    @Test
+    void ownerDeleteRemovesEntityAndCleansUpFiles() {
+        AiFairytale fairytale = completedFairytale(21L, 11L);
+        when(aiFairytaleRepository.findById(21L)).thenReturn(Optional.of(fairytale));
+
+        service.deleteMyFairytale(11L, 21L);
+
+        verify(aiFairytaleRepository).delete(fairytale);
+        verify(fileStorageService).deleteFiles(21L);
+    }
+
+    @Test
+    void nonOwnerDeleteRemainsForbiddenWithoutDeletionOrFileCleanup() {
+        AiFairytale fairytale = completedFairytale(21L, 11L);
+        when(aiFairytaleRepository.findById(21L)).thenReturn(Optional.of(fairytale));
+
+        assertApiFailure(() -> service.deleteMyFairytale(7L, 21L), 403, ErrorCode.FORBIDDEN);
+
+        verify(aiFairytaleRepository, never()).delete(fairytale);
+        verify(fileStorageService, never()).deleteFiles(21L);
     }
 
     @Test
@@ -477,6 +561,16 @@ class AiFairytaleServiceTest {
         AiGenerationProperties properties = new AiGenerationProperties();
         properties.setEnabled(true);
         return properties;
+    }
+
+    private void assertApiFailure(Runnable call, int status, ErrorCode errorCode) {
+        assertThatThrownBy(call::run)
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException businessException = (BusinessException) error;
+                    assertThat(businessException.getErrorCode().getStatus().value()).isEqualTo(status);
+                    assertThat(businessException.getErrorCode()).isEqualTo(errorCode);
+                });
     }
 
     @SuppressWarnings("unchecked")

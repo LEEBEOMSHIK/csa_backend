@@ -1,0 +1,33 @@
+[
+  {
+    "id": 101, "title": "완료된 슬라이드", "settings": "forest,friendship", "genre": "classic", "theme": "courage", "chapterCount": 2, "voiceType": "dad", "language": "ko", "format": "slide", "status": "COMPLETED", "shared": false, "videoUrl": null, "pageCount": 2, "ownerSlides": "OK",
+    "pages": [{"pageIndex": 1, "text": "첫 슬라이드", "imageUrl": "/media/slide-1.png", "audioUrl": "/media/slide-1.mp3"}, {"pageIndex": 2, "text": "둘째 슬라이드", "imageUrl": "/media/slide-2.png", "audioUrl": "/media/slide-2.mp3"}],
+    "expectedMyDto": {"id": 101, "title": "완료된 슬라이드", "format": "slide", "status": "COMPLETED", "language": "ko", "shared": false, "thumbnailUrl": "/media/slide-1.png", "pageCount": 2, "createdAt": null, "ownerId": 42},
+    "expectedSlides": {"id": 101, "title": "완료된 슬라이드", "language": "ko", "voiceType": "dad", "pages": [{"pageIndex": 1, "text": "첫 슬라이드", "imageUrl": "/media/slide-1.png", "audioUrl": "/media/slide-1.mp3"}, {"pageIndex": 2, "text": "둘째 슬라이드", "imageUrl": "/media/slide-2.png", "audioUrl": "/media/slide-2.mp3"}], "videoUrl": null}
+  },
+  {
+    "id": 102, "title": "완료된 영상", "settings": "sea,teamwork", "genre": "adventure", "theme": "kindness", "chapterCount": 2, "voiceType": "mom", "language": "ja", "format": "video", "status": "COMPLETED", "shared": true, "videoUrl": "/media/a.mp4", "pageCount": 2, "ownerSlides": "OK",
+    "pages": [{"pageIndex": 1, "text": "最初のページ", "imageUrl": "/media/video-1.png", "audioUrl": "/media/video-1.mp3"}, {"pageIndex": 2, "text": "次のページ", "imageUrl": "/media/video-2.png", "audioUrl": "/media/video-2.mp3"}],
+    "expectedMyDto": {"id": 102, "title": "완료된 영상", "format": "video", "status": "COMPLETED", "language": "ja", "shared": true, "thumbnailUrl": "/media/video-1.png", "pageCount": 2, "createdAt": null, "ownerId": 42},
+    "expectedSlides": {"id": 102, "title": "완료된 영상", "language": "ja", "voiceType": "mom", "pages": [{"pageIndex": 1, "text": "最初のページ", "imageUrl": "/media/video-1.png", "audioUrl": "/media/video-1.mp3"}, {"pageIndex": 2, "text": "次のページ", "imageUrl": "/media/video-2.png", "audioUrl": "/media/video-2.mp3"}], "videoUrl": "/media/a.mp4"}
+  },
+  {
+    "id": 103, "title": "영상 조립 실패", "settings": "sky,bravery", "genre": "fantasy", "theme": "bravery", "chapterCount": 2, "voiceType": "grandma", "language": "ko", "format": "video", "status": "FAILED", "shared": false, "videoUrl": null, "pageCount": 2, "ownerSlides": "OK",
+    "pages": [{"pageIndex": 1, "text": "남은 첫 페이지", "imageUrl": "/media/failed-video-1.png", "audioUrl": "/media/failed-video-1.mp3"}, {"pageIndex": 2, "text": "남은 둘째 페이지", "imageUrl": "/media/failed-video-2.png", "audioUrl": "/media/failed-video-2.mp3"}],
+    "expectedMyDto": {"id": 103, "title": "영상 조립 실패", "format": "video", "status": "FAILED", "language": "ko", "shared": false, "thumbnailUrl": "/media/failed-video-1.png", "pageCount": 2, "createdAt": null, "ownerId": 42},
+    "expectedSlides": {"id": 103, "title": "영상 조립 실패", "language": "ko", "voiceType": "grandma", "pages": [{"pageIndex": 1, "text": "남은 첫 페이지", "imageUrl": "/media/failed-video-1.png", "audioUrl": "/media/failed-video-1.mp3"}, {"pageIndex": 2, "text": "남은 둘째 페이지", "imageUrl": "/media/failed-video-2.png", "audioUrl": "/media/failed-video-2.mp3"}], "videoUrl": null}
+  },
+  {
+    "id": 104, "title": "슬라이드 실패", "settings": "rain,patience", "genre": "classic", "theme": "patience", "chapterCount": 1, "voiceType": "grandpa", "language": "ko", "format": "slide", "status": "FAILED", "shared": false, "videoUrl": null, "pageCount": 0, "ownerSlides": "INVALID_STATE", "pages": [],
+    "expectedMyDto": {"id": 104, "title": "슬라이드 실패", "format": "slide", "status": "FAILED", "language": "ko", "shared": false, "thumbnailUrl": null, "pageCount": 0, "createdAt": null, "ownerId": 42}, "expectedSlides": null
+  },
+  {
+    "id": 105, "title": "대기 중 슬라이드", "settings": "village,hope", "genre": "classic", "theme": "hope", "chapterCount": 1, "voiceType": "dad", "language": "ja", "format": "slide", "status": "PENDING", "shared": false, "videoUrl": null, "pageCount": 0, "ownerSlides": "INVALID_STATE", "pages": [],
+    "expectedMyDto": {"id": 105, "title": "대기 중 슬라이드", "format": "slide", "status": "PENDING", "language": "ja", "shared": false, "thumbnailUrl": null, "pageCount": 0, "createdAt": null, "ownerId": 42}, "expectedSlides": null
+  },
+  {
+    "id": 106, "title": "생성 중 영상", "settings": "mountain,wisdom", "genre": "adventure", "theme": "wisdom", "chapterCount": 1, "voiceType": "mom", "language": "ko", "format": "video", "status": "GENERATING", "shared": false, "videoUrl": null, "pageCount": 1, "ownerSlides": "INVALID_STATE",
+    "pages": [{"pageIndex": 1, "text": "아직 생성 중", "imageUrl": "/media/generating-1.png", "audioUrl": "/media/generating-1.mp3"}],
+    "expectedMyDto": {"id": 106, "title": "생성 중 영상", "format": "video", "status": "GENERATING", "language": "ko", "shared": false, "thumbnailUrl": "/media/generating-1.png", "pageCount": 1, "createdAt": null, "ownerId": 42}, "expectedSlides": null
+  }
+]
