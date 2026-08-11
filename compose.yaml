@@ -3,7 +3,7 @@ services:
     image: 'postgres:16'
     environment:
       - 'POSTGRES_DB=csa'
-      - 'POSTGRES_PASSWORD=secret'
+      - 'POSTGRES_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}'
       - 'POSTGRES_USER=myuser'
     ports:
       - '15432:5432'
@@ -17,6 +17,7 @@ services:
       retries: 5
 
   backend:
+    profiles: [full]
     build: .
     ports:
       - '18080:18080'
@@ -24,6 +25,8 @@ services:
       - SPRING_PROFILES_ACTIVE=local
       - SERVER_PORT=18080
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/csa
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+      - CSA_USER_JWT_SECRET=${CSA_USER_JWT_SECRET:?CSA_USER_JWT_SECRET is required}
       - SPRING_DOCKER_COMPOSE_LIFECYCLE-MANAGEMENT=none
       - CSA_MEDIA_STORAGE_MODE=local
       - CSA_MEDIA_STORAGE_ROOT=/app/uploads

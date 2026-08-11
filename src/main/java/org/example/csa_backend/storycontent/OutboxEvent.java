@@ -40,4 +40,22 @@ public class OutboxEvent {
 
     @Column(name = "delivered_at")
     private Instant deliveredAt;
+
+    public static OutboxEvent pending(
+        long epoch,
+        String eventType,
+        Map<String, Object> payload,
+        Instant createdAt
+    ) {
+        OutboxEvent event = new OutboxEvent();
+        event.id = UUID.randomUUID();
+        event.aggregateType = "CONTENT_MIGRATION";
+        event.aggregateId = epoch;
+        event.eventType = eventType;
+        event.barrierEpoch = epoch;
+        event.payloadJson = Map.copyOf(payload);
+        event.deliveryState = OutboxDeliveryState.PENDING;
+        event.createdAt = createdAt;
+        return event;
+    }
 }

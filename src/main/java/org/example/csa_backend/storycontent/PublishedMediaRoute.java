@@ -36,6 +36,21 @@ public class PublishedMediaRoute {
         return promotedRoot;
     }
 
+    public String promotedStorageKey(String relativeKey) {
+        if (relativeKey == null || relativeKey.isBlank() || relativeKey.indexOf('\0') >= 0
+            || relativeKey.contains("\\") || relativeKey.startsWith("/")) {
+            throw new IllegalArgumentException("Invalid promoted media storage key");
+        }
+        String normalized = Path.of(relativeKey).normalize().toString().replace('\\', '/');
+        if (!normalized.equals(relativeKey) || normalized.startsWith("../") || normalized.equals("..")) {
+            throw new IllegalArgumentException("Promoted media storage key escapes its root");
+        }
+        String promotedPrefix = prefix.isBlank()
+            ? "story-assets"
+            : prefix + "/story-assets";
+        return promotedPrefix + "/" + normalized;
+    }
+
     private String normalizePrefix(String value) {
         if (value == null || value.isBlank()) {
             return "";

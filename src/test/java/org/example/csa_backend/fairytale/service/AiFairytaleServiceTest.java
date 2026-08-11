@@ -10,6 +10,8 @@ import org.example.csa_backend.fairytale.AiFairytaleRepository;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
+import org.example.csa_backend.storycontent.migration.ContentMigrationGate;
+import org.example.csa_backend.storycontent.migration.ContentWriteActivityTracker;
 import org.example.csa_backend.user.User;
 import org.example.csa_backend.user.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -41,6 +43,12 @@ class AiFairytaleServiceTest {
     private final AiVideoAssemblyService aiVideoAssemblyService = mock(AiVideoAssemblyService.class);
     private final UserRepository userRepository = mock(UserRepository.class);
     private final AiGenerationProperties aiGenerationProperties = enabledAiGenerationProperties();
+    private final ContentWriteActivityTracker writeActivityTracker =
+            new ContentWriteActivityTracker(mock(ContentMigrationGate.class));
+    private final org.example.csa_backend.storycontent.ContentReadRouter contentReadRouter =
+            legacyReadRouter();
+    private final org.example.csa_backend.fairytale.CanonicalAiReadRepository canonicalReadRepository =
+            mock(org.example.csa_backend.fairytale.CanonicalAiReadRepository.class);
     private final AiFairytaleService service = new AiFairytaleService(
             aiFairytaleRepository,
             aiFairytalePageRepository,
@@ -50,7 +58,11 @@ class AiFairytaleServiceTest {
             fileStorageService,
             aiVideoAssemblyService,
             userRepository,
-            aiGenerationProperties
+            aiGenerationProperties,
+            mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+            writeActivityTracker,
+            contentReadRouter,
+            canonicalReadRepository
     );
 
     @Test
@@ -65,7 +77,11 @@ class AiFairytaleServiceTest {
                 fileStorageService,
                 aiVideoAssemblyService,
                 userRepository,
-                disabledProperties
+                disabledProperties,
+                mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+                writeActivityTracker,
+                contentReadRouter,
+                canonicalReadRepository
         );
 
         assertThatThrownBy(() -> disabledService.generate(null, null))
@@ -342,7 +358,11 @@ class AiFairytaleServiceTest {
                 fileStorageService,
                 aiVideoAssemblyService,
                 userRepository,
-                aiGenerationProperties
+                aiGenerationProperties,
+                mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+                writeActivityTracker,
+                contentReadRouter,
+                canonicalReadRepository
         );
 
         byte[] imageBytes = {1, 2, 3};
@@ -392,7 +412,11 @@ class AiFairytaleServiceTest {
                 fileStorageService,
                 aiVideoAssemblyService,
                 userRepository,
-                aiGenerationProperties
+                aiGenerationProperties,
+                mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+                writeActivityTracker,
+                contentReadRouter,
+                canonicalReadRepository
         );
 
         when(aiTextService.generate(any(), anyString(), anyString(), anyInt(), anyBoolean(), anyString()))
@@ -436,7 +460,11 @@ class AiFairytaleServiceTest {
                 fileStorageService,
                 aiVideoAssemblyService,
                 userRepository,
-                aiGenerationProperties
+                aiGenerationProperties,
+                mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+                writeActivityTracker,
+                contentReadRouter,
+                canonicalReadRepository
         );
 
         when(aiTextService.generate(any(), anyString(), anyString(), anyInt(), anyBoolean(), anyString()))
@@ -486,7 +514,11 @@ class AiFairytaleServiceTest {
                 fileStorageService,
                 aiVideoAssemblyService,
                 userRepository,
-                aiGenerationProperties
+                aiGenerationProperties,
+                mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+                writeActivityTracker,
+                contentReadRouter,
+                canonicalReadRepository
         );
 
         try {
@@ -561,6 +593,15 @@ class AiFairytaleServiceTest {
         AiGenerationProperties properties = new AiGenerationProperties();
         properties.setEnabled(true);
         return properties;
+    }
+
+    private org.example.csa_backend.storycontent.ContentReadRouter legacyReadRouter() {
+        var repository = mock(
+            org.example.csa_backend.storycontent.ContentMigrationControlRepository.class);
+        var control = mock(org.example.csa_backend.storycontent.ContentMigrationControl.class);
+        when(repository.getSingleton()).thenReturn(control);
+        when(control.getReadSource()).thenReturn(org.example.csa_backend.storycontent.ContentSource.LEGACY);
+        return new org.example.csa_backend.storycontent.ContentReadRouter(repository);
     }
 
     private void assertApiFailure(Runnable call, int status, ErrorCode errorCode) {

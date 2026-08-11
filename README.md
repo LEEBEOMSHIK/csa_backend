@@ -34,17 +34,32 @@
 
 PostgreSQL은 `spring-boot-docker-compose`가 `compose.yaml`의 컨테이너를 자동 기동합니다.
 로컬 포트는 다른 프로젝트와 충돌하지 않도록 백엔드 `18080`, PostgreSQL `15432`를 사용합니다.
+비민감 local 설정은 tracked `application.yaml`의 `local` 문서에 있으며,
+`application-local.yaml`을 만들거나 복사하지 않습니다. DB 비밀번호와 사용자 백엔드 JWT secret은
+현재 프로세스 환경변수로만 주입합니다.
 
-```bash
-./gradlew bootRun
+```powershell
+$secureDbPassword = Read-Host 'Local DB password (reuse it for the existing postgres volume)' -AsSecureString
+$env:DB_PASSWORD = [System.Net.NetworkCredential]::new('', $secureDbPassword).Password
+$jwtBytes = [byte[]]::new(48)
+$random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$random.GetBytes($jwtBytes)
+$random.Dispose()
+$env:CSA_USER_JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
+.\gradlew.bat bootRun
 ```
+
+기존 PostgreSQL volume이 있으면 최초 초기화 때 사용한 DB 비밀번호를 다시 입력해야 합니다.
+비밀번호가 맞지 않아도 volume을 임의로 삭제하지 마세요. 환경변수는 이 PowerShell 프로세스에만 남으며,
+실행 shell을 닫으면 다시 설정해야 합니다.
 
 ### local — Docker Compose 전체 실행
 
 백엔드 앱과 PostgreSQL을 모두 컨테이너로 기동합니다.
+위 PowerShell block으로 `DB_PASSWORD`와 `CSA_USER_JWT_SECRET`을 먼저 설정한 뒤 실행합니다.
 
-```bash
-docker compose up --build
+```powershell
+docker compose --profile full up --build
 ```
 
 컨테이너 실행 후 백엔드는 `http://localhost:18080`에서 접근합니다.
@@ -67,11 +82,12 @@ docker compose -f compose.prod.yaml up --build
 
 | 프로파일 | 설정 파일 | compose 파일 | 용도 |
 |----------|-----------|--------------|------|
-| `local` | `application-local.yaml` | `compose.yaml` | 로컬 개발 (기본값) |
+| `local` | `application.yaml`의 `local` 문서 | `compose.yaml` | 로컬 개발 (기본값) |
 | `dev` | `application-dev.yaml` | `compose.dev.yaml` | 개발 서버 배포 |
 | `prod` | `application-prod.yaml` | `compose.prod.yaml` | 운영 서버 배포 |
 
-각 환경의 DB 접속 정보·JWT Secret은 해당 `application-{profile}.yaml` 파일에서 관리합니다.
+local의 비민감 접속 정보는 tracked config에서 관리하고, `DB_PASSWORD`와
+`CSA_USER_JWT_SECRET`은 기본값 없는 필수 환경변수입니다. 운영 자격 증명도 repository file에 저장하지 않습니다.
 
 ---
 
@@ -149,7 +165,6 @@ src/
 │   │   └── CsaBackendApplication.java
 │   └── resources/
 │       ├── application.yaml
-│       ├── application-local.yaml
 │       ├── application-dev.yaml
 │       └── application-prod.yaml
 └── test/

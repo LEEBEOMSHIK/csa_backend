@@ -56,4 +56,10 @@ public class Story {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    public void archive(Instant now) {
+        visibility = StoryVisibility.ARCHIVED;
+        archivedAt = now;
+        updatedAt = now;
+    }
 }

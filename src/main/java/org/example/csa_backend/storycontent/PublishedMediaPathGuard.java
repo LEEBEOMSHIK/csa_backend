@@ -29,6 +29,27 @@ final class PublishedMediaPathGuard {
         return target;
     }
 
+    static Path requireSafeWriteTarget(Path configuredRoot, Path candidate) throws IOException {
+        Path root = configuredRoot.toAbsolutePath().normalize();
+        Path target = candidate.toAbsolutePath().normalize();
+        if (!target.startsWith(root)) {
+            throw new IOException("Published media path escapes configured root");
+        }
+        ensureNoLinkOrReparseComponents(target);
+        if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+                throw new IOException("Published media root is not a directory");
+            }
+            Path existing = nearestExisting(target);
+            Path realRoot = root.toRealPath();
+            Path realExisting = existing.toRealPath();
+            if (!realExisting.startsWith(realRoot)) {
+                throw new IOException("Published media real path escapes configured root");
+            }
+        }
+        return target;
+    }
+
     private static void ensureNoLinkOrReparseComponents(Path target) throws IOException {
         Path current = target.getRoot();
         if (current == null) {
@@ -40,6 +61,17 @@ final class PublishedMediaPathGuard {
                 throw new IOException("Published media path contains a link or reparse point");
             }
         }
+    }
+
+    private static Path nearestExisting(Path target) throws IOException {
+        Path current = target;
+        while (current != null && !Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+            current = current.getParent();
+        }
+        if (current == null) {
+            throw new IOException("Published media path has no existing ancestor");
+        }
+        return current;
     }
 
     private static boolean isLinkOrReparsePoint(Path path) throws IOException {

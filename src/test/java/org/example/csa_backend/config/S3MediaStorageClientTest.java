@@ -8,7 +8,10 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.core.ResponseBytes;
 
 import java.util.List;
 import java.util.stream.IntStream;
@@ -25,6 +28,20 @@ class S3MediaStorageClientTest {
 
     private final S3Client s3Client = mock(S3Client.class);
     private final S3MediaStorageClient client = new S3MediaStorageClient(s3Client, "my-bucket");
+
+    @Test
+    void readGetsExactBucketAndKeyBytes() {
+        byte[] expected = new byte[]{4, 5, 6};
+        when(s3Client.getObjectAsBytes(any(GetObjectRequest.class)))
+            .thenReturn(ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), expected));
+
+        assertThat(client.read("fairytales/7/page_1.png")).isEqualTo(expected);
+
+        ArgumentCaptor<GetObjectRequest> requestCaptor = ArgumentCaptor.forClass(GetObjectRequest.class);
+        verify(s3Client).getObjectAsBytes(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().bucket()).isEqualTo("my-bucket");
+        assertThat(requestCaptor.getValue().key()).isEqualTo("fairytales/7/page_1.png");
+    }
 
     @Test
     void uploadSendsPutObjectWithBucketKeyAndContentType() {

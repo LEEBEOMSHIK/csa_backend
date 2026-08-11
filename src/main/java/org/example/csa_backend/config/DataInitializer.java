@@ -2,11 +2,15 @@ package org.example.csa_backend.config;
 
 import lombok.RequiredArgsConstructor;
 import org.example.csa_backend.fairytale.*;
+import org.example.csa_backend.storycontent.ContentMigrationControlRepository;
+import org.example.csa_backend.storycontent.migration.ContentWriteActivityTracker;
+import org.example.csa_backend.storycontent.migration.ContentWriteKind;
 import org.example.csa_backend.user.User;
 import org.example.csa_backend.user.UserRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +19,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@Profile("!content-migration")
 @RequiredArgsConstructor
 public class DataInitializer implements ApplicationRunner {
 
@@ -23,6 +28,8 @@ public class DataInitializer implements ApplicationRunner {
     private final CategoryRepository categoryRepository;
     private final FairytaleRepository fairytaleRepository;
     private final FairytaleDetailRepository fairytaleDetailRepository;
+    private final ContentMigrationControlRepository contentMigrationControlRepository;
+    private final ContentWriteActivityTracker contentWriteActivityTracker;
 
     @Override
     @Transactional
@@ -30,8 +37,23 @@ public class DataInitializer implements ApplicationRunner {
         if (!userRepository.existsByEmail("test@test.com")) {
             userRepository.save(new User("test@test.com", passwordEncoder.encode("test1234")));
         }
-        initFairytaleData();
-        initFairytaleDetailDataIfMissing();
+        initContentDataIfMissing();
+    }
+
+    private void initContentDataIfMissing() {
+        boolean fairytaleDataMissing = categoryRepository.count() == 0;
+        boolean fairytaleDetailsMissing = fairytaleDetailRepository.count() == 0;
+        if (!fairytaleDataMissing && !fairytaleDetailsMissing) {
+            return;
+        }
+        if (!contentMigrationControlRepository.existsById((short) 1)) {
+            return;
+        }
+        contentWriteActivityTracker.execute(ContentWriteKind.LEGACY_CURATED, () -> {
+            initFairytaleData();
+            initFairytaleDetailDataIfMissing();
+            return null;
+        });
     }
 
     private void initFairytaleData() {

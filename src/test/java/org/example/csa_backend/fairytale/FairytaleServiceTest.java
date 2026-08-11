@@ -3,6 +3,10 @@ package org.example.csa_backend.fairytale;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
+import org.example.csa_backend.storycontent.ContentMigrationControl;
+import org.example.csa_backend.storycontent.ContentMigrationControlRepository;
+import org.example.csa_backend.storycontent.ContentReadRouter;
+import org.example.csa_backend.storycontent.ContentSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -18,12 +22,16 @@ class FairytaleServiceTest {
 
     private final FairytaleDetailRepository fairytaleDetailRepository = mock(FairytaleDetailRepository.class);
     private final CuratedFairytalePageRepository curatedFairytalePageRepository = mock(CuratedFairytalePageRepository.class);
+    private final ContentMigrationControlRepository controlRepository = controlRepository();
     private final FairytaleService service = new FairytaleService(
             mock(CategoryRepository.class),
             mock(FairytaleRepository.class),
             fairytaleDetailRepository,
             curatedFairytalePageRepository,
-            mock(org.example.csa_backend.storycontent.LegacyStoryLinkRepository.class)
+            mock(org.example.csa_backend.storycontent.LegacyStoryLinkRepository.class),
+            mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+            new ContentReadRouter(controlRepository),
+            mock(CanonicalCuratedReadRepository.class)
     );
 
     @Test
@@ -120,5 +128,14 @@ class FairytaleServiceTest {
                 fairytale, "작가", "作者", "3-5", 5, 1, "본문", "本文");
         ReflectionTestUtils.setField(detail, "contentVersion", contentVersion);
         return detail;
+    }
+
+    private ContentMigrationControlRepository controlRepository() {
+        ContentMigrationControlRepository repository = mock(ContentMigrationControlRepository.class);
+        ContentMigrationControl control = new ContentMigrationControl();
+        ReflectionTestUtils.setField(control, "singletonId", (short) 1);
+        ReflectionTestUtils.setField(control, "readSource", ContentSource.LEGACY);
+        when(repository.getSingleton()).thenReturn(control);
+        return repository;
     }
 }

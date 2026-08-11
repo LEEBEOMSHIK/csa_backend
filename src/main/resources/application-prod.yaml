@@ -5,6 +5,7 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
+      schema: front
       maximum-pool-size: 10
       minimum-idle: 5
   jpa:

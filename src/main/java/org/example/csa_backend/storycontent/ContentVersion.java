@@ -80,4 +80,9 @@ public class ContentVersion {
         draft.updatedAt = now;
         return draft;
     }
+
+    public void archive(Instant now) {
+        status = ContentVersionStatus.ARCHIVED;
+        updatedAt = Objects.requireNonNull(now);
+    }
 }

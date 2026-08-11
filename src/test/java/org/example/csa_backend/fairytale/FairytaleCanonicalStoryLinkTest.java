@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import org.example.csa_backend.fairytale.dto.FairytaleDto;
-import org.example.csa_backend.storycontent.LegacyStoryLink;
 import org.example.csa_backend.storycontent.LegacyStoryLinkRepository;
 import org.example.csa_backend.storycontent.LegacyType;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,20 +45,19 @@ class FairytaleCanonicalStoryLinkTest {
             fairytaleRepository,
             fairytaleDetailRepository,
             curatedFairytalePageRepository,
-            legacyStoryLinkRepository
+            legacyStoryLinkRepository,
+            org.mockito.Mockito.mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+            legacyRouter(),
+            org.mockito.Mockito.mock(CanonicalCuratedReadRepository.class)
         );
     }
 
     @Test
     void curatedDtoKeepsLegacyIdAndAddsCanonicalStoryIdWhenImported() {
         Fairytale fairytale = fairytale(12L);
-        LegacyStoryLink link = new LegacyStoryLink();
-        ReflectionTestUtils.setField(link, "legacyType", LegacyType.CURATED);
-        ReflectionTestUtils.setField(link, "legacyId", 12L);
-        ReflectionTestUtils.setField(link, "storyId", 77L);
         when(fairytaleRepository.findCurated(isNull(), any(Sort.class))).thenReturn(List.of(fairytale));
-        when(legacyStoryLinkRepository.findByLegacyTypeAndLegacyId(LegacyType.CURATED, 12L))
-            .thenReturn(Optional.of(link));
+        when(legacyStoryLinkRepository.findPublishedStoryId(LegacyType.CURATED.name(), 12L))
+            .thenReturn(Optional.of(77L));
 
         FairytaleDto dto = service.getFairytales(null, "latest").get(0);
 
@@ -71,7 +69,7 @@ class FairytaleCanonicalStoryLinkTest {
     void unimportedCuratedDtoKeepsLegacyIdAndNullCanonicalStoryId() {
         Fairytale fairytale = fairytale(12L);
         when(fairytaleRepository.findCurated(isNull(), any(Sort.class))).thenReturn(List.of(fairytale));
-        when(legacyStoryLinkRepository.findByLegacyTypeAndLegacyId(LegacyType.CURATED, 12L))
+        when(legacyStoryLinkRepository.findPublishedStoryId(LegacyType.CURATED.name(), 12L))
             .thenReturn(Optional.empty());
 
         FairytaleDto dto = service.getFairytales(null, "latest").get(0);
@@ -86,5 +84,15 @@ class FairytaleCanonicalStoryLinkTest {
         );
         ReflectionTestUtils.setField(fairytale, "id", id);
         return fairytale;
+    }
+
+    private org.example.csa_backend.storycontent.ContentReadRouter legacyRouter() {
+        var repository = org.mockito.Mockito.mock(
+            org.example.csa_backend.storycontent.ContentMigrationControlRepository.class);
+        var control = org.mockito.Mockito.mock(
+            org.example.csa_backend.storycontent.ContentMigrationControl.class);
+        when(repository.getSingleton()).thenReturn(control);
+        when(control.getReadSource()).thenReturn(org.example.csa_backend.storycontent.ContentSource.LEGACY);
+        return new org.example.csa_backend.storycontent.ContentReadRouter(repository);
     }
 }

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class SharedSchemaMigrationHarnessTest {
 
     @Test
-    void migratesTheSharedLocalDatabaseThroughV14() {
+    void migratesTheSharedLocalDatabaseThroughV15() {
         String url = System.getProperty("csa.sharedDbUrl", "jdbc:postgresql://localhost:15432/csa");
         String username = System.getProperty("csa.sharedDbUsername", "myuser");
         String password = System.getProperty("csa.sharedDbPassword", "secret");
@@ -23,6 +23,6 @@ class SharedSchemaMigrationHarnessTest {
 
         flyway.migrate();
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("14");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("15");
     }
 }

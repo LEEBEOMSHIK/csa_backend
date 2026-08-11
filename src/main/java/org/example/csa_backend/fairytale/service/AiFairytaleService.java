@@ -9,10 +9,16 @@ import org.example.csa_backend.fairytale.AiFairytale;
 import org.example.csa_backend.fairytale.AiFairytalePage;
 import org.example.csa_backend.fairytale.AiFairytalePageRepository;
 import org.example.csa_backend.fairytale.AiFairytaleRepository;
+import org.example.csa_backend.fairytale.CanonicalAiReadRepository;
 import org.example.csa_backend.fairytale.FairytaleDownloadLog;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateRequest;
 import org.example.csa_backend.fairytale.dto.FairytaleGenerateResponse;
 import org.example.csa_backend.fairytale.dto.MyFairytaleDto;
+import org.example.csa_backend.storycontent.LegacyShadowReadObserver;
+import org.example.csa_backend.storycontent.LegacyType;
+import org.example.csa_backend.storycontent.ContentReadRouter;
+import org.example.csa_backend.storycontent.migration.ContentWriteActivityTracker;
+import org.example.csa_backend.storycontent.migration.ContentWriteKind;
 import org.example.csa_backend.user.UserRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -36,8 +42,17 @@ public class AiFairytaleService {
     private final UserRepository userRepository;
     private final AiGenerationProperties aiGenerationProperties;
 
+    private final LegacyShadowReadObserver shadowReadObserver;
+    private final ContentWriteActivityTracker writeActivityTracker;
+    private final ContentReadRouter contentReadRouter;
+    private final CanonicalAiReadRepository canonicalReadRepository;
+
     @Transactional
     public FairytaleGenerateResponse generate(FairytaleGenerateRequest request, Long userId) {
+        return writeActivityTracker.execute(ContentWriteKind.LEGACY_AI, () -> generateLegacy(request, userId));
+    }
+
+    private FairytaleGenerateResponse generateLegacy(FairytaleGenerateRequest request, Long userId) {
         if (!aiGenerationProperties.isEnabled()) {
             throw new BusinessException(ErrorCode.FEATURE_DISABLED);
         }
@@ -148,6 +163,13 @@ public class AiFairytaleService {
 
     @Transactional(readOnly = true)
     public List<MyFairytaleDto> getMyFairytales(Long userId) {
+        return contentReadRouter.route(
+            () -> getLegacyMyFairytales(userId),
+            () -> canonicalReadRepository.getMyFairytales(userId)
+        );
+    }
+
+    private List<MyFairytaleDto> getLegacyMyFairytales(Long userId) {
         return aiFairytaleRepository.findByOwnerIdOrderByIdDesc(userId).stream()
                 .map(MyFairytaleDto::from)
                 .toList();
@@ -155,6 +177,13 @@ public class AiFairytaleService {
 
     @Transactional(readOnly = true)
     public List<MyFairytaleDto> getSharedFairytales() {
+        return contentReadRouter.route(
+            this::getLegacySharedFairytales,
+            canonicalReadRepository::getSharedFairytales
+        );
+    }
+
+    private List<MyFairytaleDto> getLegacySharedFairytales() {
         return aiFairytaleRepository.findBySharedAndStatusOrderByIdDesc("Y", "COMPLETED").stream()
                 .map(MyFairytaleDto::from)
                 .toList();
@@ -162,15 +191,31 @@ public class AiFairytaleService {
 
     @Transactional(readOnly = true)
     public FairytaleGenerateResponse getMyFairytaleSlides(Long userId, Long fairytaleId) {
+        return contentReadRouter.route(
+            () -> getLegacyMyFairytaleSlides(userId, fairytaleId),
+            () -> canonicalReadRepository.getMyFairytaleSlides(userId, fairytaleId)
+        );
+    }
+
+    private FairytaleGenerateResponse getLegacyMyFairytaleSlides(Long userId, Long fairytaleId) {
         AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
         if (!isServableAsSlides(fairytale)) {
             throw new BusinessException(ErrorCode.INVALID_STATE);
         }
-        return FairytaleGenerateResponse.from(fairytale);
+        FairytaleGenerateResponse response = FairytaleGenerateResponse.from(fairytale);
+        observeShadow(fairytaleId);
+        return response;
     }
 
     @Transactional(readOnly = true)
     public FairytaleGenerateResponse getSharedFairytaleSlides(Long fairytaleId) {
+        return contentReadRouter.route(
+            () -> getLegacySharedFairytaleSlides(fairytaleId),
+            () -> canonicalReadRepository.getSharedFairytaleSlides(fairytaleId)
+        );
+    }
+
+    private FairytaleGenerateResponse getLegacySharedFairytaleSlides(Long fairytaleId) {
         AiFairytale fairytale = aiFairytaleRepository.findById(fairytaleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         if (!fairytale.isShared()) {
@@ -179,7 +224,9 @@ public class AiFairytaleService {
         if (!isServableAsSlides(fairytale)) {
             throw new BusinessException(ErrorCode.INVALID_STATE);
         }
-        return FairytaleGenerateResponse.from(fairytale);
+        FairytaleGenerateResponse response = FairytaleGenerateResponse.from(fairytale);
+        observeShadow(fairytaleId);
+        return response;
     }
 
     /**
@@ -201,16 +248,21 @@ public class AiFairytaleService {
 
     @Transactional
     public boolean toggleShare(Long userId, Long fairytaleId) {
-        AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
-        fairytale.updateShared(!fairytale.isShared());
-        return fairytale.isShared();
+        return writeActivityTracker.execute(ContentWriteKind.LEGACY_AI, () -> {
+            AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
+            fairytale.updateShared(!fairytale.isShared());
+            return fairytale.isShared();
+        });
     }
 
     @Transactional
     public void deleteMyFairytale(Long userId, Long fairytaleId) {
-        AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
-        aiFairytaleRepository.delete(fairytale);
-        fileStorageService.deleteFiles(fairytaleId);
+        writeActivityTracker.execute(ContentWriteKind.LEGACY_AI, () -> {
+            AiFairytale fairytale = getOwnedFairytale(userId, fairytaleId);
+            aiFairytaleRepository.delete(fairytale);
+            fileStorageService.deleteFiles(fairytaleId);
+            return null;
+        });
     }
 
     /**
@@ -240,5 +292,12 @@ public class AiFairytaleService {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
         return fairytale;
+    }
+
+    private void observeShadow(Long fairytaleId) {
+        if (fairytaleId == null) {
+            return;
+        }
+        shadowReadObserver.observe(LegacyType.AI, fairytaleId);
     }
 }

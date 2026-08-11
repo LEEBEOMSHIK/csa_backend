@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest;
 import org.example.csa_backend.storycontent.dto.StoryRuntimeManifestResponse;
+import org.example.csa_backend.storycontent.migration.LegacyMediaSnapshotStore;
+import org.example.csa_backend.storycontent.migration.LegacyProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +48,9 @@ class StoryRuntimeSecurityPathTest {
 
     @Autowired
     private WebApplicationContext context;
+
+    @Autowired
+    private LegacyMediaSnapshotStore legacyMediaSnapshotStore;
 
     @MockitoBean
     private StoryRuntimeService storyRuntimeService;
@@ -88,6 +94,44 @@ class StoryRuntimeSecurityPathTest {
         mockMvc.perform(get("/uploads/phase1/content/story-assets/7/versions/17/image.png"))
             .andExpect(status().isOk())
             .andExpect(content().bytes(bytes));
+    }
+
+    @Test
+    void importedAssetAndManifestUseThePrefixedPromotedPublicRoute() throws Exception {
+        byte[] imageBytes = "imported-image".getBytes(StandardCharsets.UTF_8);
+        byte[] manifestBytes = "{}".getBytes(StandardCharsets.UTF_8);
+        Path source = MEDIA_ROOT.resolve("legacy-import-source/page.png");
+        Files.createDirectories(source.getParent());
+        Files.write(source, imageBytes);
+        LegacyProjection projection = importedProjection(
+            909L,
+            "/uploads/legacy-import-source/page.png"
+        );
+
+        LegacyMediaSnapshotStore.PreparedImport preparedImport =
+            legacyMediaSnapshotStore.prepare(projection);
+        legacyMediaSnapshotStore.materialize(preparedImport);
+        LegacyMediaSnapshotStore.PreparedAsset image =
+            preparedImport.media().assets().get("page-0-image");
+        LegacyMediaSnapshotStore.PreparedAsset manifest = legacyMediaSnapshotStore.writeManifest(
+            preparedImport.projection(),
+            909L,
+            1_909L,
+            manifestBytes
+        );
+
+        mockMvc.perform(get(URI.create(image.publicUrl()).getPath()))
+            .andExpect(status().isOk())
+            .andExpect(content().bytes(imageBytes));
+        mockMvc.perform(get(URI.create(manifest.publicUrl()).getPath()))
+            .andExpect(status().isOk())
+            .andExpect(content().bytes(manifestBytes));
+        assertThat(image.storageKey()).startsWith(
+            MEDIA_PREFIX + "/story-assets/imports/curated/909/"
+        );
+        assertThat(manifest.storageKey()).startsWith(
+            MEDIA_PREFIX + "/story-assets/imports/curated/909/"
+        );
     }
 
     @Test
@@ -141,6 +185,44 @@ class StoryRuntimeSecurityPathTest {
         );
         return StoryRuntimeManifestResponse.flat(
             manifest, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+    }
+
+    private LegacyProjection importedProjection(long legacyId, String imageUrl) {
+        return new LegacyProjection(
+            LegacyType.CURATED,
+            legacyId,
+            StoryOrigin.CURATED,
+            Long.toString(legacyId),
+            null,
+            StoryVisibility.PUBLISHED,
+            "title",
+            "title",
+            "description",
+            "description",
+            List.of(),
+            ContentVersionStatus.PUBLISHED,
+            true,
+            "slide",
+            "COMPLETED",
+            "ko",
+            null,
+            Map.of("ko", List.of()),
+            Map.of(),
+            List.of(new LegacyProjection.SceneProjection(
+                "page-0",
+                0,
+                1_000,
+                1,
+                1,
+                Map.of("ko", "text"),
+                imageUrl,
+                List.of(),
+                null
+            )),
+            List.of(),
+            null,
+            "a".repeat(64)
         );
     }
 

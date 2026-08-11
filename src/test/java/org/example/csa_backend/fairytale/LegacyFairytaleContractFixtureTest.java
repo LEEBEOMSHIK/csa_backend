@@ -47,7 +47,13 @@ class LegacyFairytaleContractFixtureTest {
             mock(FileStorageService.class),
             mock(AiVideoAssemblyService.class),
             mock(UserRepository.class),
-            new AiGenerationProperties()
+            new AiGenerationProperties(),
+            mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+            new org.example.csa_backend.storycontent.migration.ContentWriteActivityTracker(
+                mock(org.example.csa_backend.storycontent.migration.ContentMigrationGate.class)
+            ),
+            legacyRouter(),
+            mock(CanonicalAiReadRepository.class)
     );
     private final FairytaleDetailRepository fairytaleDetailRepository = mock(FairytaleDetailRepository.class);
     private final CuratedFairytalePageRepository curatedFairytalePageRepository = mock(CuratedFairytalePageRepository.class);
@@ -56,7 +62,10 @@ class LegacyFairytaleContractFixtureTest {
             mock(FairytaleRepository.class),
             fairytaleDetailRepository,
             curatedFairytalePageRepository,
-            mock(org.example.csa_backend.storycontent.LegacyStoryLinkRepository.class)
+            mock(org.example.csa_backend.storycontent.LegacyStoryLinkRepository.class),
+            mock(org.example.csa_backend.storycontent.LegacyShadowReadObserver.class),
+            legacyRouter(),
+            mock(CanonicalCuratedReadRepository.class)
     );
 
     @ParameterizedTest
@@ -119,6 +128,15 @@ class LegacyFairytaleContractFixtureTest {
             }
             return OBJECT_MAPPER.readValue(input, type);
         }
+    }
+
+    private static org.example.csa_backend.storycontent.ContentReadRouter legacyRouter() {
+        var repository = mock(
+            org.example.csa_backend.storycontent.ContentMigrationControlRepository.class);
+        var control = mock(org.example.csa_backend.storycontent.ContentMigrationControl.class);
+        when(repository.getSingleton()).thenReturn(control);
+        when(control.getReadSource()).thenReturn(org.example.csa_backend.storycontent.ContentSource.LEGACY);
+        return new org.example.csa_backend.storycontent.ContentReadRouter(repository);
     }
 
     private FairytaleDetail curatedDetail(CuratedInput input) {

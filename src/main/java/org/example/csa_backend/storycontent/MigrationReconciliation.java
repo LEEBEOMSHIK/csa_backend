@@ -29,4 +29,20 @@ public class MigrationReconciliation {
 
     @Column(name = "completed_at", nullable = false)
     private Instant completedAt;
+
+    public static MigrationReconciliation completed(
+        long epoch,
+        ReconciliationStatus status,
+        String checksum,
+        Map<String, Object> reportJson,
+        Instant completedAt
+    ) {
+        MigrationReconciliation reconciliation = new MigrationReconciliation();
+        reconciliation.epoch = epoch;
+        reconciliation.status = status;
+        reconciliation.checksum = checksum;
+        reconciliation.reportJson = Map.copyOf(reportJson);
+        reconciliation.completedAt = completedAt;
+        return reconciliation;
+    }
 }

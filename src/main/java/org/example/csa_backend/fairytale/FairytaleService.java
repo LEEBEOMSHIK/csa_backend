@@ -9,7 +9,9 @@ import org.example.csa_backend.fairytale.dto.CuratedSlidesResponse;
 import org.example.csa_backend.common.exception.BusinessException;
 import org.example.csa_backend.common.exception.ErrorCode;
 import org.example.csa_backend.storycontent.LegacyStoryLinkRepository;
+import org.example.csa_backend.storycontent.LegacyShadowReadObserver;
 import org.example.csa_backend.storycontent.LegacyType;
+import org.example.csa_backend.storycontent.ContentReadRouter;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,10 @@ public class FairytaleService {
     private final CuratedFairytalePageRepository curatedFairytalePageRepository;
     private final LegacyStoryLinkRepository legacyStoryLinkRepository;
 
+    private final LegacyShadowReadObserver shadowReadObserver;
+    private final ContentReadRouter contentReadRouter;
+    private final CanonicalCuratedReadRepository canonicalReadRepository;
+
     public List<CategoryDto> getCategories() {
         return categoryRepository.findAllOrderByFairytaleCountDesc().stream()
                 .map(CategoryDto::from)
@@ -36,6 +42,13 @@ public class FairytaleService {
     }
 
     public HomePageDto getHomePage(String categoryKey) {
+        return contentReadRouter.route(
+            () -> getLegacyHomePage(categoryKey),
+            () -> canonicalReadRepository.getHomePage(categoryKey)
+        );
+    }
+
+    private HomePageDto getLegacyHomePage(String categoryKey) {
         String key = (categoryKey != null && !categoryKey.isBlank()) ? categoryKey : null;
 
         List<FairytaleDto> themes = fairytaleRepository.findThemes(key).stream()
@@ -54,12 +67,28 @@ public class FairytaleService {
     }
 
     public FairytaleDetailDto getFairytaleDetail(Long fairytaleId) {
+        return contentReadRouter.route(
+            () -> getLegacyFairytaleDetail(fairytaleId),
+            () -> canonicalReadRepository.getFairytaleDetail(fairytaleId)
+        );
+    }
+
+    private FairytaleDetailDto getLegacyFairytaleDetail(Long fairytaleId) {
         FairytaleDetail detail = fairytaleDetailRepository.findActiveByFairytaleId(fairytaleId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detail not found"));
-        return FairytaleDetailDto.from(detail);
+        FairytaleDetailDto response = FairytaleDetailDto.from(detail);
+        observeShadow(fairytaleId);
+        return response;
     }
 
     public CuratedSlidesResponse getCuratedSlides(Long fairytaleId) {
+        return contentReadRouter.route(
+            () -> getLegacyCuratedSlides(fairytaleId),
+            () -> canonicalReadRepository.getCuratedSlides(fairytaleId)
+        );
+    }
+
+    private CuratedSlidesResponse getLegacyCuratedSlides(Long fairytaleId) {
         FairytaleDetail detail = fairytaleDetailRepository.findActiveByFairytaleId(fairytaleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         String contentVersion = detail.getContentVersion();
@@ -71,10 +100,19 @@ public class FairytaleService {
         if (pages.isEmpty()) {
             throw new BusinessException(ErrorCode.NOT_FOUND);
         }
-        return CuratedSlidesResponse.from(detail, pages);
+        CuratedSlidesResponse response = CuratedSlidesResponse.from(detail, pages);
+        observeShadow(fairytaleId);
+        return response;
     }
 
     public List<FairytaleDto> getFairytales(String categoryKey, String sort) {
+        return contentReadRouter.route(
+            () -> getLegacyFairytales(categoryKey, sort),
+            () -> canonicalReadRepository.getFairytales(categoryKey, sort)
+        );
+    }
+
+    private List<FairytaleDto> getLegacyFairytales(String categoryKey, String sort) {
         String key = (categoryKey != null && !categoryKey.isBlank()) ? categoryKey : null;
         return fairytaleRepository.findCurated(key, resolveSort(sort)).stream()
                 .map(this::toDto)
@@ -83,10 +121,16 @@ public class FairytaleService {
 
     private FairytaleDto toDto(Fairytale fairytale) {
         Long canonicalStoryId = legacyStoryLinkRepository
-                .findByLegacyTypeAndLegacyId(LegacyType.CURATED, fairytale.getId())
-                .map(link -> link.getStoryId())
+                .findPublishedStoryId(LegacyType.CURATED.name(), fairytale.getId())
                 .orElse(null);
         return FairytaleDto.from(fairytale, canonicalStoryId);
+    }
+
+    private void observeShadow(Long fairytaleId) {
+        if (fairytaleId == null) {
+            return;
+        }
+        shadowReadObserver.observe(LegacyType.CURATED, fairytaleId);
     }
 
     private Sort resolveSort(String sort) {

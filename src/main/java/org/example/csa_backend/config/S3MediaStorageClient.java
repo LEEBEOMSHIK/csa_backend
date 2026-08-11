@@ -11,6 +11,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.Delete;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
@@ -62,6 +63,15 @@ public class S3MediaStorageClient {
                 .contentType(contentType)
                 .build();
         s3Client.putObject(request, RequestBody.fromBytes(data));
+    }
+
+    public byte[] read(String key) {
+        if (key == null || key.isBlank() || key.indexOf('\0') >= 0 || key.contains("\\")) {
+            throw new IllegalArgumentException("Invalid S3 media key");
+        }
+        return s3Client.getObjectAsBytes(
+            GetObjectRequest.builder().bucket(bucket).key(key).build()
+        ).asByteArray();
     }
 
     public void deleteByPrefix(String prefix) {
