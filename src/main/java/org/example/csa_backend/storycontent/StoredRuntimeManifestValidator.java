@@ -9,9 +9,14 @@ import java.util.Set;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeAsset;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeAudioCue;
+import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeAction;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeAudioVariant;
+import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeBackground;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeLayer;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeScene;
+import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeTrack;
+import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeTransition;
+import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeTrigger;
 import org.example.csa_backend.storycontent.dto.StoredRuntimeManifest.RuntimeVideo;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -20,15 +25,35 @@ import tools.jackson.databind.JsonNode;
 public class StoredRuntimeManifestValidator {
 
     private static final String UNAVAILABLE = "PUBLISHED_MANIFEST_UNAVAILABLE";
+    private static final String CORRUPT = "PUBLISHED_MANIFEST_CORRUPT";
     private static final Set<String> AUDIO_ROLES = Set.of("NARRATION", "SFX", "BGM");
     private static final Set<String> LAYER_TYPES = Set.of(
         "BACKGROUND", "IMAGE", "TEXT", "SPRITE", "CHARACTER_SLOT", "SHAPE"
     );
     private static final Set<String> OUTPUT_MODES = Set.of("UPLOADED_MASTER", "GENERATED");
+    private static final Set<String> TRACK_PROPERTIES = Set.of(
+        "TRANSLATE_X", "TRANSLATE_Y", "SCALE_X", "SCALE_Y", "ROTATION", "OPACITY", "SHAKE"
+    );
+    private static final Set<String> EASINGS = Set.of("LINEAR", "EASE_IN", "EASE_OUT", "EASE_IN_OUT");
+    private static final Set<String> EVENTS = Set.of("TAP");
+    private static final Set<String> REPEAT_POLICIES = Set.of(
+        "ONCE_PER_CONTENT_VERSION", "ONCE_PER_SESSION", "REPEATABLE"
+    );
+    private static final Set<String> ACTION_TYPES = Set.of("PLAY_TRACK", "PLAY_AUDIO", "SET_VISIBILITY");
+    private static final Set<String> TRANSITIONS = Set.of(
+        "USER_NEXT", "NARRATION_END", "TIMED_NEXT", "STORY_END"
+    );
 
     public void validate(JsonNode storedJson, StoredRuntimeManifest manifest, Rendition rendition) {
-        validateRawShape(storedJson);
-        validateRoot(manifest, rendition);
+        try {
+            validateRawShape(storedJson);
+            validateRoot(manifest, rendition);
+        } catch (StoryRuntimeException exception) {
+            if (manifest != null && manifest.runtimeSchemaVersion() == 2) {
+                throw StoryRuntimeException.unavailable(CORRUPT);
+            }
+            throw exception;
+        }
     }
 
     private void validateRawShape(JsonNode root) {
@@ -93,6 +118,9 @@ public class StoredRuntimeManifestValidator {
             requiredArray(scene, "tracks");
             requiredArray(scene, "triggers");
             requiredArray(scene, "transitions");
+            if (root.path("runtimeSchemaVersion").asInt() == 2) {
+                validateRawInteractiveScene(scene);
+            }
         });
 
         requiredArray(root, "videoVariants").forEach(this::validateRawVideo);
@@ -100,6 +128,52 @@ public class StoredRuntimeManifestValidator {
         if (video != null && !video.isNull()) {
             validateRawVideo(video);
         }
+    }
+
+    private void validateRawInteractiveScene(JsonNode scene) {
+        JsonNode background = scene.get("background");
+        if (background != null && !background.isNull()) {
+            if (!background.isObject()) {
+                invalid();
+            }
+            requiredText(background, "layerKey");
+            requiredText(background, "fit");
+            requiredBoolean(background, "loop");
+            requiredIntegral(background, "startOffsetMs");
+        }
+        requiredArray(scene, "tracks").forEach(track -> {
+            requiredText(track, "trackKey");
+            requiredText(track, "targetLayerKey");
+            requiredText(track, "property");
+            requiredNumber(track, "from");
+            requiredNumber(track, "to");
+            requiredIntegral(track, "startMs");
+            requiredIntegral(track, "durationMs");
+            requiredText(track, "easing");
+        });
+        requiredArray(scene, "triggers").forEach(trigger -> {
+            requiredText(trigger, "triggerKey");
+            requiredText(trigger, "targetLayerKey");
+            requiredText(trigger, "event");
+            requiredText(trigger, "repeatPolicy");
+            requiredIntegral(trigger, "videoCueMs");
+            requiredObject(trigger, "accessibilityLabel");
+            requiredArray(trigger, "actions");
+        });
+        requiredArray(scene, "transitions").forEach(transition -> requiredText(transition, "type"));
+        requiredArray(scene, "audioCues").forEach(cue -> {
+            JsonNode playback = cue.get("playback");
+            if (playback != null && !playback.isNull()) {
+                if (!playback.isObject()) {
+                    invalid();
+                }
+                requiredNumber(playback, "gainDb");
+                requiredBoolean(playback, "loop");
+                requiredIntegral(playback, "fadeInMs");
+                requiredIntegral(playback, "fadeOutMs");
+                requiredIntegral(playback, "maxSimultaneousInstances");
+            }
+        });
     }
 
     private void validateRawVideo(JsonNode video) {
@@ -119,13 +193,14 @@ public class StoredRuntimeManifestValidator {
 
     private void validateRoot(StoredRuntimeManifest manifest, Rendition rendition) {
         if (manifest == null || rendition == null
-            || manifest.runtimeSchemaVersion() != 1
+            || (manifest.runtimeSchemaVersion() != 1 && manifest.runtimeSchemaVersion() != 2)
             || manifest.storyId() <= 0
             || manifest.contentVersionId() <= 0
             || manifest.contentVersionId() != rendition.getVersionId()
             || !positiveInteger(manifest.version())
             || !enumValue(StoryOrigin.class, manifest.origin())
-            || !("SLIDE".equals(manifest.rendition()) || "VIDEO".equals(manifest.rendition()))
+            || !("SLIDE".equals(manifest.rendition()) || "VIDEO".equals(manifest.rendition())
+                || "INTERACTIVE".equals(manifest.rendition()))
             || !"SLIDE".equals(manifest.fallbackRendition())
             || !positiveInteger(manifest.rendererVersion())
             || !Integer.toString(rendition.getRendererVersion()).equals(manifest.rendererVersion())) {
@@ -140,10 +215,135 @@ public class StoredRuntimeManifestValidator {
 
         Map<String, RuntimeAsset> assets = validateAssets(manifest.assets());
         validateScenes(manifest.scenes(), locales, assets);
+        if (manifest.runtimeSchemaVersion() == 1) {
+            requireV1Scenes(manifest.scenes());
+        } else {
+            validateInteractiveScenes(manifest.scenes(), locales, assets);
+        }
         validateAudioVariants(manifest.audioVariants(), manifest.scenes(), locales, assets);
         List<RuntimeVideo> variants = manifest.videoVariants();
         validateVideoVariants(variants, locales, manifest.availableVoiceTypes(), assets);
         validateSelectedVideo(manifest, variants, locales, assets);
+    }
+
+    private void requireV1Scenes(List<RuntimeScene> scenes) {
+        for (RuntimeScene scene : scenes) {
+            if (scene.background() != null || !scene.tracks().isEmpty() || !scene.triggers().isEmpty()
+                || !scene.transitions().isEmpty()
+                || scene.audioCues().stream().anyMatch(cue -> cue.playback() != null)) {
+                invalid();
+            }
+        }
+    }
+
+    private void validateInteractiveScenes(
+        List<RuntimeScene> scenes, Set<String> locales, Map<String, RuntimeAsset> assets
+    ) {
+        for (RuntimeScene scene : scenes) {
+            Map<String, RuntimeLayer> layers = new HashMap<>();
+            for (RuntimeLayer layer : scene.layers()) {
+                layers.put(layer.layerKey(), layer);
+            }
+            Map<String, RuntimeAudioCue> cues = new HashMap<>();
+            for (RuntimeAudioCue cue : scene.audioCues()) {
+                cues.put(cue.cueKey(), cue);
+                if (cue.playback() != null) {
+                    validateInteractivePlayback(cue, scene.durationMs());
+                }
+            }
+            RuntimeBackground background = scene.background();
+            if (background != null) {
+                RuntimeLayer backgroundLayer = layers.get(background.layerKey());
+                RuntimeAsset backgroundAsset = backgroundLayer == null ? null : assets.get(backgroundLayer.assetKey());
+                RuntimeAsset fallbackAsset = assets.get(scene.fallbackAssetKey());
+                if (backgroundLayer == null || background.startOffsetMs() < 0
+                    || !Set.of("COVER", "CONTAIN").contains(background.fit())
+                    || !"BACKGROUND".equals(backgroundLayer.type()) || backgroundAsset == null
+                    || !Set.of("IMAGE", "VIDEO").contains(backgroundAsset.kind())
+                    || ("VIDEO".equals(backgroundAsset.kind())
+                        && (fallbackAsset == null || !"IMAGE".equals(fallbackAsset.kind())))) {
+                    invalid();
+                }
+            }
+            Map<String, RuntimeTrack> tracks = new HashMap<>();
+            for (RuntimeTrack track : scene.tracks()) {
+                if (blank(track.trackKey()) || tracks.putIfAbsent(track.trackKey(), track) != null
+                    || !layers.containsKey(track.targetLayerKey()) || !TRACK_PROPERTIES.contains(track.property())
+                    || track.from() == null || track.to() == null || track.startMs() < 0
+                    || track.durationMs() < 0 || track.startMs() > scene.durationMs()
+                    || track.durationMs() > scene.durationMs() - track.startMs()
+                    || !EASINGS.contains(track.easing())) {
+                    invalid();
+                }
+            }
+            Set<String> triggerKeys = new HashSet<>();
+            for (RuntimeTrigger trigger : scene.triggers()) {
+                if (blank(trigger.triggerKey()) || !triggerKeys.add(trigger.triggerKey())
+                    || !layers.containsKey(trigger.targetLayerKey()) || !EVENTS.contains(trigger.event())
+                    || !REPEAT_POLICIES.contains(trigger.repeatPolicy()) || trigger.videoCueMs() < 0
+                    || trigger.videoCueMs() > scene.durationMs() || trigger.accessibilityLabel() == null
+                    || !trigger.accessibilityLabel().keySet().equals(locales)
+                    || trigger.accessibilityLabel().values().stream().anyMatch(this::blank)
+                    || trigger.actions() == null || trigger.actions().isEmpty()) {
+                    invalid();
+                }
+                for (RuntimeAction action : trigger.actions()) {
+                    validateAction(action, tracks, cues, layers);
+                }
+            }
+            for (RuntimeTransition transition : scene.transitions()) {
+                boolean timed = "TIMED_NEXT".equals(transition.type());
+                if (!TRANSITIONS.contains(transition.type()) || (timed && transition.atMs() == null)
+                    || (!timed && transition.atMs() != null) || (transition.atMs() != null
+                    && (transition.atMs() < 0 || transition.atMs() > scene.durationMs()))) {
+                    invalid();
+                }
+            }
+        }
+    }
+
+    private void validateInteractivePlayback(RuntimeAudioCue cue, long sceneDurationMs) {
+        var playback = cue.playback();
+        if (playback == null || playback.gainDb() == null
+            || playback.gainDb().compareTo(new BigDecimal("-60")) < 0
+            || playback.gainDb().compareTo(new BigDecimal("6")) > 0 || playback.fadeInMs() < 0
+            || playback.fadeOutMs() < 0 || playback.fadeInMs() > sceneDurationMs
+            || playback.fadeOutMs() > sceneDurationMs
+            || playback.fadeInMs() + playback.fadeOutMs() > sceneDurationMs
+            || playback.maxSimultaneousInstances() < 1
+            || playback.maxSimultaneousInstances() > 4) {
+            invalid();
+        }
+        if ("BGM".equals(cue.role())) {
+            if (!playback.loop() || playback.duckingDb() == null
+                || playback.duckingDb().compareTo(new BigDecimal("12")) < 0
+                || playback.duckingDb().compareTo(new BigDecimal("18")) > 0) {
+                invalid();
+            }
+        } else if (playback.loop() || playback.duckingDb() != null) {
+            invalid();
+        }
+    }
+
+    private void validateAction(
+        RuntimeAction action,
+        Map<String, RuntimeTrack> tracks,
+        Map<String, RuntimeAudioCue> cues,
+        Map<String, RuntimeLayer> layers
+    ) {
+        if (action == null || !ACTION_TYPES.contains(action.type())) {
+            invalid();
+        }
+        if ("PLAY_TRACK".equals(action.type()) && !tracks.containsKey(action.trackKey())) {
+            invalid();
+        }
+        if ("PLAY_AUDIO".equals(action.type()) && !cues.containsKey(action.audioCueKey())) {
+            invalid();
+        }
+        if ("SET_VISIBILITY".equals(action.type())
+            && (!layers.containsKey(action.layerKey()) || action.visible() == null)) {
+            invalid();
+        }
     }
 
     private void validateVoices(StoredRuntimeManifest manifest, Set<String> locales) {
@@ -304,7 +504,7 @@ public class StoredRuntimeManifestValidator {
     ) {
         RuntimeVideo video = manifest.video();
         if (video == null) {
-            if (!"SLIDE".equals(manifest.rendition())) {
+            if (!("SLIDE".equals(manifest.rendition()) || "INTERACTIVE".equals(manifest.rendition()))) {
                 invalid();
             }
             return;

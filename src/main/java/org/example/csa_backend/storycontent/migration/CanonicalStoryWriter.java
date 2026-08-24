@@ -362,6 +362,7 @@ public class CanonicalStoryWriter {
                 scene.durationMs(),
                 sortedMap(scene.text()),
                 imageKey,
+                null,
                 runtimeCues,
                 runtimeLayers,
                 List.of(),

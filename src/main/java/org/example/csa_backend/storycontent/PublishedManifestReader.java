@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 public class PublishedManifestReader {
 
     private static final String UNAVAILABLE = "PUBLISHED_MANIFEST_UNAVAILABLE";
+    private static final String CORRUPT = "PUBLISHED_MANIFEST_CORRUPT";
 
     private final AssetRepository assetRepository;
     private final PublishedMediaStorage mediaStorage;
@@ -34,8 +35,14 @@ public class PublishedManifestReader {
             if (!actualChecksum.equals(rendition.getChecksum())) {
                 throw StoryRuntimeException.unavailable(UNAVAILABLE);
             }
-            JsonNode storedJson = objectMapper.readTree(bytes);
-            StoredRuntimeManifest manifest = objectMapper.treeToValue(storedJson, StoredRuntimeManifest.class);
+            JsonNode storedJson;
+            StoredRuntimeManifest manifest;
+            try {
+                storedJson = objectMapper.readTree(bytes);
+                manifest = objectMapper.treeToValue(storedJson, StoredRuntimeManifest.class);
+            } catch (RuntimeException exception) {
+                throw StoryRuntimeException.unavailable(CORRUPT, exception);
+            }
             manifestValidator.validate(storedJson, manifest, rendition);
             return new VerifiedStoredManifest(manifest, actualChecksum);
         } catch (StoryRuntimeException exception) {

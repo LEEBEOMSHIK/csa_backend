@@ -38,7 +38,8 @@ class RuntimeManifestFixtureContractTest {
     private static Stream<Arguments> fixturePairs() {
         return Stream.of(
             Arguments.of("story-runtime-v1-static-slide-stored.json", "story-runtime-v1-static-slide.json"),
-            Arguments.of("story-runtime-v1-uploaded-video-stored.json", "story-runtime-v1-uploaded-video.json")
+            Arguments.of("story-runtime-v1-uploaded-video-stored.json", "story-runtime-v1-uploaded-video.json"),
+            Arguments.of("story-runtime-v2-interactive-stored.json", "story-runtime-v2-interactive.json")
         );
     }
 

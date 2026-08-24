@@ -61,6 +61,35 @@ class StoryContentSchemaPostgresTest {
     }
 
     @Test
+    void scenePropertiesJsonDefaultsToAnEmptyObjectAndPersistsStructuredData() {
+        long versionId = insertVersion();
+        long sceneId = jdbc.queryForObject(
+            "insert into story_scenes (version_id, scene_key, order_index, width, height) "
+                + "values (?, 'scene-v2', 0, 1280, 720) returning id",
+            Long.class,
+            versionId
+        );
+
+        assertThat(jdbc.queryForObject(
+            "select properties_json::text from story_scenes where id = ?",
+            String.class,
+            sceneId
+        )).isEqualTo("{}");
+
+        jdbc.update(
+            "update story_scenes set properties_json = ?::jsonb where id = ?",
+            "{\"schemaVersion\":1,\"tracks\":[]}",
+            sceneId
+        );
+
+        assertThat(jdbc.queryForObject(
+            "select properties_json ->> 'schemaVersion' from story_scenes where id = ?",
+            Integer.class,
+            sceneId
+        )).isEqualTo(1);
+    }
+
+    @Test
     void publishedPointerAndVersionConstraintsAreEnforced() {
         long storyId = insertStory();
 

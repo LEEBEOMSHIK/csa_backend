@@ -49,6 +49,7 @@ public class RuntimeManifestMapper {
         }
         return scenes.stream().map(scene -> new RuntimeScene(
             scene.sceneKey(), scene.orderIndex(), scene.durationMs(), scene.text(), scene.fallbackAssetKey(),
+            scene.background(),
             scene.audioCues().stream().map(cue -> projectCue(scene.sceneKey(), cue, variantAssets, locale, voiceType))
                 .toList(),
             scene.layers(), scene.tracks(), scene.triggers(), scene.transitions()
@@ -68,7 +69,7 @@ public class RuntimeManifestMapper {
         } else {
             assetKey = variantAssets.getOrDefault(tuple(sceneKey, cue.cueKey(), "und", "none"), assetKey);
         }
-        return new RuntimeAudioCue(cue.cueKey(), cue.role(), assetKey, cue.startMs());
+        return new RuntimeAudioCue(cue.cueKey(), cue.role(), assetKey, cue.startMs(), cue.playback());
     }
 
     private String requiredVariant(

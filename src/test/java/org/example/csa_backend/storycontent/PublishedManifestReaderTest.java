@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
+import java.util.List;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -99,13 +101,36 @@ class PublishedManifestReaderTest {
     }
 
     @Test
-    void malformedStoredBytesReturnStableUnavailable() throws Exception {
+    void malformedStoredBytesReturnStableCorrupt() throws Exception {
         byte[] malformed = "not-json".getBytes(StandardCharsets.UTF_8);
         Rendition rendition = rendition(sha256.hex(malformed));
         when(assetRepository.findById(MANIFEST_ASSET_ID)).thenReturn(Optional.of(manifestAsset()));
         when(mediaStorage.read(STORAGE_KEY)).thenReturn(malformed);
 
-        assertUnavailable(() -> reader.readAndVerify(rendition));
+        assertCorrupt(() -> reader.readAndVerify(rendition));
+    }
+
+    @Test
+    void v2PlaybackPrimitiveCorruptionReturnsStableCorruptThroughReader() throws Exception {
+        for (Consumer<tools.jackson.databind.node.ObjectNode> mutation : List.<Consumer<tools.jackson.databind.node.ObjectNode>>of(
+            root -> playback(root).remove("loop"),
+            root -> playback(root).remove("fadeOutMs"),
+            root -> {
+                playback(root).put("fadeInMs", 5000);
+                playback(root).put("fadeOutMs", 5000);
+            }
+        )) {
+            tools.jackson.databind.node.ObjectNode corrupt = storedFixture("story-runtime-v2-interactive-stored.json");
+            mutation.accept(corrupt);
+            byte[] bytes = objectMapper.writeValueAsBytes(corrupt);
+            Rendition rendition = rendition(sha256.hex(bytes));
+            set(rendition, "type", RenditionType.INTERACTIVE);
+            set(rendition, "rendererVersion", 2);
+            when(assetRepository.findById(MANIFEST_ASSET_ID)).thenReturn(Optional.of(manifestAsset()));
+            when(mediaStorage.read(STORAGE_KEY)).thenReturn(bytes);
+
+            assertCorrupt(() -> reader.readAndVerify(rendition));
+        }
     }
 
     @Test
@@ -131,11 +156,11 @@ class PublishedManifestReaderTest {
     }
 
     @Test
-    void nullAudioVariantElementReturnsStableUnavailable() throws Exception {
+    void nullAudioVariantElementReturnsStableCorrupt() throws Exception {
         tools.jackson.databind.node.ObjectNode corrupt = storedFixture("story-runtime-v1-static-slide-stored.json");
         corrupt.putArray("audioVariants").addNull();
 
-        assertCorruptUnavailable(corrupt);
+        assertCorruptReader(corrupt);
     }
 
     @Test
@@ -190,7 +215,7 @@ class PublishedManifestReaderTest {
     }
 
     @Test
-    void nullVideoVariantElementReturnsStableUnavailable() throws Exception {
+    void nullVideoVariantElementReturnsStableCorrupt() throws Exception {
         byte[] storedBytes = fixture("story-runtime-v1-uploaded-video-stored.json");
         tools.jackson.databind.node.ObjectNode corrupt = (tools.jackson.databind.node.ObjectNode)
             objectMapper.readTree(storedBytes);
@@ -201,7 +226,7 @@ class PublishedManifestReaderTest {
         when(assetRepository.findById(MANIFEST_ASSET_ID)).thenReturn(Optional.of(manifestAsset()));
         when(mediaStorage.read(STORAGE_KEY)).thenReturn(corruptBytes);
 
-        assertUnavailable(() -> reader.readAndVerify(rendition));
+        assertCorrupt(() -> reader.readAndVerify(rendition));
     }
 
     @Test
@@ -271,12 +296,28 @@ class PublishedManifestReaderTest {
             });
     }
 
+    private void assertCorrupt(ThrowingCall call) {
+        assertThatThrownBy(call::run)
+            .isInstanceOfSatisfying(StoryRuntimeException.class, exception -> {
+                assertThat(exception.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+                assertThat(exception.getCode()).isEqualTo("PUBLISHED_MANIFEST_CORRUPT");
+            });
+    }
+
     private void assertCorruptUnavailable(tools.jackson.databind.node.ObjectNode corrupt) throws Exception {
         byte[] corruptBytes = objectMapper.writeValueAsBytes(corrupt);
         Rendition rendition = rendition(sha256.hex(corruptBytes));
         when(assetRepository.findById(MANIFEST_ASSET_ID)).thenReturn(Optional.of(manifestAsset()));
         when(mediaStorage.read(STORAGE_KEY)).thenReturn(corruptBytes);
         assertUnavailable(() -> reader.readAndVerify(rendition));
+    }
+
+    private void assertCorruptReader(tools.jackson.databind.node.ObjectNode corrupt) throws Exception {
+        byte[] corruptBytes = objectMapper.writeValueAsBytes(corrupt);
+        Rendition rendition = rendition(sha256.hex(corruptBytes));
+        when(assetRepository.findById(MANIFEST_ASSET_ID)).thenReturn(Optional.of(manifestAsset()));
+        when(mediaStorage.read(STORAGE_KEY)).thenReturn(corruptBytes);
+        assertCorrupt(() -> reader.readAndVerify(rendition));
     }
 
     private Rendition rendition(String checksum) {
@@ -314,6 +355,11 @@ class PublishedManifestReaderTest {
 
     private tools.jackson.databind.node.ObjectNode storedFixture(String name) throws Exception {
         return (tools.jackson.databind.node.ObjectNode) objectMapper.readTree(fixture(name));
+    }
+
+    private static tools.jackson.databind.node.ObjectNode playback(tools.jackson.databind.node.ObjectNode root) {
+        return (tools.jackson.databind.node.ObjectNode) root.path("scenes").path(0)
+            .path("audioCues").path(0).path("playback");
     }
 
     private void set(Object target, String field, Object value) {

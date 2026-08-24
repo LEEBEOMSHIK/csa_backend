@@ -1,7 +1,10 @@
 package org.example.csa_backend.storycontent;
 
 import jakarta.persistence.*;
+import java.util.Map;
 import lombok.Getter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -31,4 +34,8 @@ public class Scene {
 
     @Column(name = "fallback_asset_id")
     private Long fallbackAssetId;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "properties_json", nullable = false, columnDefinition = "jsonb")
+    private Map<String, Object> propertiesJson = Map.of();
 }
